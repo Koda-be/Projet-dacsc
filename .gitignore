@@ -53,4 +53,11 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+
 compile_commands.json
+
+
+bin/debug/*
+bin/release/*
+objs/*
