@@ -6,48 +6,30 @@
 #include <netdb.h>
 #include "sockets.h"
 
-int serverSocket(int port)
+static int cslib_getaddrinfo(const char* host, const int port, const int hint_flags, struct addrinfo** results);
+
+int cslib_serverSocket(int port)
 {
     int s = socket(AF_INET, SOCK_STREAM, 0);
 
     if(s == -1) return CSLIB_ERROR_SOCKET_CREATION;
 
-    struct addrinfo hints;
     struct addrinfo *results;
-    memset(&hints,0,sizeof(struct addrinfo));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
 
-    size_t count = 0;
-    int cpy = port;
-    
-    do 
-    {
-        cpy /= 10;
-        ++count;
-    }while (cpy != 0);
 
-    char* portstr = (char*) malloc(count+1);
-    snprintf(portstr, count+1, "%d", port);
-
-    if (getaddrinfo(NULL,portstr,&hints,&results) != 0)
+    if(cslib_getaddrinfo(NULL, port, AI_PASSIVE | AI_NUMERICSERV,&results) != 0)
     {
         close(s);
         freeaddrinfo(results);
-        free(portstr);
         return CSLIB_ERROR_ADDRESS_INFO_OBTENTION;
     }
 
     if(bind(s, results->ai_addr, results->ai_addrlen) < 0)
     {
         freeaddrinfo(results);
-        free(portstr);
         return CSLIB_ERROR_SOCKET_BINDING;
     }
-
     freeaddrinfo(results);
-    free(portstr);
 
     if(listen(s, SOMAXCONN) == -1) 
     {
@@ -75,3 +57,48 @@ int cslib_accept(int socket)
 {
 
 } */
+
+
+// Internal functions
+
+static int cslib_getaddrinfo(const char* host, const int port, const int hint_flags, struct addrinfo** results)
+{
+    struct addrinfo hints;
+    memset(&hints,0,sizeof(struct addrinfo));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = hint_flags;
+
+    size_t count = 0;
+    int cpy = port;
+
+    const char* hoststr;
+    char* iptostr = NULL;
+
+    if(hint_flags & AI_NUMERICHOST && host != NULL)
+    {
+        size_t strsize = strlen("000.000.000.000") + 1;
+        iptostr = (char*) malloc(strsize);
+
+        snprintf(iptostr, strsize, "%d.%d.%d.%d", host[0], host[1], host[2], host[3]);
+        hoststr = iptostr;
+    }
+    else hoststr = host;
+
+    do 
+    {
+        cpy /= 10;
+        ++count;
+    }while (cpy != 0);
+
+    char* portstr = (char*) malloc(count+1);
+    snprintf(portstr, count+1, "%d", port);
+
+
+    int retval = getaddrinfo(hoststr,portstr,&hints,results);
+
+    free(iptostr);
+    free(portstr);
+    
+    return retval;
+}
