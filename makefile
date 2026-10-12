@@ -35,25 +35,25 @@ $(CMODULES):	$(OBJS)/$@.o
 
 tests:	$(TESTS)
 
-.SECONDEXPANSION:
-$(CTESTS):	MODNAME =$(patsubst $(DEBUG)/%.test,%,$@)
-
-$(CTESTS):	$(OBJS)/debug_$$(MODNAME).o $(OBJS)/test_$$(MODNAME).o
-			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $(DEBUG)/$(MODNAME).test
-
-
+# Target for the object file of the module in debug mode
 .SECONDEXPANSION:
 $(OBJS)/debug_%.o:	MODNAME =$(patsubst $(OBJS)/debug_%.o,%,$@)
 
 $(OBJS)/debug_%.o:	$$(MODNAME)/module/$$(MODNAME).c $$(MODNAME)/$$(MODNAME).h
 			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
 
-
+# Target for the object file of the module's testing program
 .SECONDEXPANSION:
 $(OBJS)/test_%.o:	MODNAME =$(patsubst $(OBJS)/test_%.o,%,$@)
 
 $(OBJS)/test_%.o:	$$(MODNAME)/module/test.c $$(MODNAME)/$$(MODNAME.h)
 			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
+
+
+# Module testing targets
+
+$(DEBUG)/sockets.test:	$(OBJS)/debug_sockets.o $(OBJS)/test_sockets.o
+			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $(DEBUG)/sockets.test
 
 
 #phony targets
