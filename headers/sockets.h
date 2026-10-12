@@ -2,6 +2,7 @@
 #define __SOCKET_LIBRARY_H_
 
 #include <stddef.h>
+#include <unistd.h>
 
 #define CSLIB_ERROR_SOCKET_CREATION -1
 #define CSLIB_ERROR_ADDRESS_INFO_OBTENTION -2
@@ -20,9 +21,9 @@ int cslib_accept(int srvrscket);
 int cslib_clientSocket(char* ip, int port);
 
 /* Sends bffr_size bytes from msg to sckt*/
-size_t cslib_send(int sckt, const char* msg, size_t bffr_size);
+ssize_t cslib_send(int sckt, const char* msg, size_t bffr_size);
 
 /* Reads bffr_size bytes from sckt and writes them in memory, then assigns msg to point to said memory */
-size_t cslib_receive(int sckt, char* msg, size_t bffr_size);
+ssize_t cslib_receive(int sckt, char* msg, size_t bffr_size);
 
 #endif

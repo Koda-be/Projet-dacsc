@@ -19,6 +19,7 @@ int cslib_serverSocket(int port)
 
     if(cslib_getaddrinfo(NULL, port, AI_PASSIVE,&results) != 0)
     {
+
         close(s);
         freeaddrinfo(results);
         return CSLIB_ERROR_ADDRESS_INFO_OBTENTION;
@@ -74,6 +75,15 @@ int cslib_clientSocket(char* ip, int port)
     return s;
 }
 
+ssize_t cslib_send(int sckt, const char* msg, size_t bffr_size)
+{
+    return write(sckt, msg, bffr_size);
+}
+
+ssize_t cslib_receive(int sckt, char *msg, size_t bffr_size)
+{
+    return read(sckt, msg, bffr_size);
+}
 
 // Internal functions
 

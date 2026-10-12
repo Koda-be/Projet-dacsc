@@ -5,9 +5,9 @@ RELEASE=$(BIN)/release
 
 #C compiler
 CCOMP=gcc
-HEADERS=$(CMODULE_NAMES)
+HEADERS=./headers
 WFLAGS=-pedantic-errors -Werror -Wall -Wextra -Wconversion -Wsign-conversion
-FLAGS=-I $(HEADERS) $(WFLAGS)
+FLAGS=-I$(HEADERS) $(WFLAGS)
 DEBUGFLAGS=-ggdb
 RELEASEFLAGS=-O2 -D NDEBUG
 
@@ -35,19 +35,22 @@ $(CMODULES):	$(OBJS)/$@.o
 
 tests:	$(TESTS)
 
+
 # Target for the object file of the module in debug mode
 .SECONDEXPANSION:
 $(OBJS)/debug_%.o:	MODNAME =$(patsubst $(OBJS)/debug_%.o,%,$@)
 
-$(OBJS)/debug_%.o:	$$(MODNAME)/module/$$(MODNAME).c $$(MODNAME)/$$(MODNAME).h
+$(OBJS)/debug_%.o:	$$(MODNAME)/$$(MODNAME).c $(HEADERS)/%.h
 			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
+
 
 # Target for the object file of the module's testing program
 .SECONDEXPANSION:
 $(OBJS)/test_%.o:	MODNAME =$(patsubst $(OBJS)/test_%.o,%,$@)
 
-$(OBJS)/test_%.o:	$$(MODNAME)/module/test.c $$(MODNAME)/$$(MODNAME.h)
-			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
+$(OBJS)/test_%.o:	$$(MODNAME)/test.c $(HEADERS)/$$(MODNAME).h
+					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
+
 
 
 # Module testing targets
@@ -60,11 +63,11 @@ $(DEBUG)/sockets.test:	$(OBJS)/debug_sockets.o $(OBJS)/test_sockets.o
 .PHONY:	clean clobber newmod
 
 clean:
-		rm $(OBJS)/*.o
+		rm -f $(OBJS)/*.o
 
 clobber: clean
-		rm $(RELEASE)/*
-		rm $(DEBUG)/*
+		rm -f $(RELEASE)/*
+		rm -f $(DEBUG)/*
 
 
 
@@ -79,13 +82,12 @@ ifndef LANG
 else
 ifeq ($(LANG), C)
 				cp -r CModuleTemplate $(NAME)
-				mv $(NAME)/main.h $(NAME)/$(NAME).h
+				touch $(HEADERS)/$(NAME).h
 				echo $(NAME_UP)
-				echo -e "#ifndef DACSC__$(NAME_UP)_H_\n#define DACSC__$(NAME_UP)_H_\n\n\n#endif\n" > $(NAME)/$(NAME).h
-				mv $(NAME)/module/main.c $(NAME)/module/$(NAME).c
-				echo -e "#include \"$(NAME)\"\n\n" > $(NAME)/module/$(NAME).c
-				echo -e "#include \"$(NAME)\"\n\n" > $(NAME)/module/test.c
-				echo -e "int main(int argc, char* argv[])\n{\n\n}\n" >> $(NAME)/module/test.c
+				echo -e "#ifndef DACSC__$(NAME_UP)_H_\n#define DACSC__$(NAME_UP)_H_\n\n\n#endif\n" > $(HEADERS)/$(NAME).h
+				mv $(NAME)/main.c $(NAME)/$(NAME).c
+				echo -e "#include \"$(NAME).h\"\n\n" > $(NAME)/$(NAME).c
+				echo -e "#include <stdio.h>\n#include <stdlib.h>\n#include \"$(NAME).h\"\n\nint main(int argc, char* argv[])\n{\n\n}\n" >> $(NAME)/test.c
 else
 				echo "Language unsupported"
 endif
