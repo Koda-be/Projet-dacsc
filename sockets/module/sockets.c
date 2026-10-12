@@ -40,9 +40,9 @@ int cslib_serverSocket(int port)
     return s;
 }
 
-int cslib_accept(int srvcscket)
+int cslib_accept(int srvrscket)
 {
-    int s = accept(srvcscket, NULL, NULL);
+    int s = accept(srvrscket, NULL, NULL);
 
     if(s == -1)
     {
