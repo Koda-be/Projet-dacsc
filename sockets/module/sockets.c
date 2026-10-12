@@ -17,7 +17,7 @@ int cslib_serverSocket(int port)
     struct addrinfo *results;
 
 
-    if(cslib_getaddrinfo(NULL, port, AI_PASSIVE | AI_NUMERICSERV,&results) != 0)
+    if(cslib_getaddrinfo(NULL, port, AI_PASSIVE,&results) != 0)
     {
         close(s);
         freeaddrinfo(results);
@@ -40,9 +40,9 @@ int cslib_serverSocket(int port)
     return s;
 }
 
-int cslib_accept(int socket)
+int cslib_accept(int srvcscket)
 {
-    int s = accept(socket, NULL, NULL);
+    int s = accept(srvcscket, NULL, NULL);
 
     if(s == -1)
     {
@@ -53,10 +53,26 @@ int cslib_accept(int socket)
     return s;
 }
 
-/* int cslib_clientSocket(char* ip, int port)
+int cslib_clientSocket(char* ip, int port)
 {
+    int s = socket(AF_INET, SOCK_STREAM, 0);
 
-} */
+    struct addrinfo* results;
+
+    if(cslib_getaddrinfo(ip, port, 0, &results) != 0)
+    {
+        freeaddrinfo(results);
+        return CSLIB_ERROR_ADDRESS_INFO_OBTENTION;
+    }
+
+    if(connect(s, results->ai_addr, results->ai_addrlen) == -1)
+    {
+        freeaddrinfo(results);
+        return CSLIB_ERROR_CONNECT_TO_SERVER;
+    }
+
+    return s;
+}
 
 
 // Internal functions
@@ -67,7 +83,7 @@ static int cslib_getaddrinfo(const char* host, const int port, const int hint_fl
     memset(&hints,0,sizeof(struct addrinfo));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = hint_flags;
+    hints.ai_flags = hint_flags | AI_NUMERICSERV;
 
     size_t count = 0;
     int cpy = port;
@@ -80,7 +96,7 @@ static int cslib_getaddrinfo(const char* host, const int port, const int hint_fl
         size_t strsize = strlen("000.000.000.000") + 1;
         iptostr = (char*) malloc(strsize);
 
-        snprintf(iptostr, strsize, "%d.%d.%d.%d", host[0], host[1], host[2], host[3]);
+        snprintf(iptostr, strsize, "%hhd.%hhd.%hhd.%hhd", (int) host[0], (int) host[1], (int) host[2], (int) host[3]);
         hoststr = iptostr;
     }
     else hoststr = host;
