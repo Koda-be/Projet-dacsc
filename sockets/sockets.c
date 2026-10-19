@@ -12,7 +12,7 @@ int cslib_serverSocket(int port)
 {
     int s = socket(AF_INET, SOCK_STREAM, 0);
 
-    if(s == -1) return CSLIB_ERROR_SOCKET_CREATION;
+    if(s == -1) return CSLIB_ESOCKET_CREATION;
 
     struct addrinfo *results;
 
@@ -22,20 +22,20 @@ int cslib_serverSocket(int port)
 
         close(s);
         freeaddrinfo(results);
-        return CSLIB_ERROR_ADDRESS_INFO_OBTENTION;
+        return CSLIB_EADDRESS_INFO_OBTENTION;
     }
 
     if(bind(s, results->ai_addr, results->ai_addrlen) < 0)
     {
         freeaddrinfo(results);
-        return CSLIB_ERROR_SOCKET_BINDING;
+        return CSLIB_ESOCKET_BINDING;
     }
     freeaddrinfo(results);
 
     if(listen(s, SOMAXCONN) == -1) 
     {
         close(s);
-        return CSLIB_ERROR_LISTENING_START;
+        return CSLIB_ELISTENING_START;
     } 
 
     return s;
@@ -48,7 +48,7 @@ int cslib_accept(int srvrscket)
     if(s == -1)
     {
         close(s);
-        return CSLIB_ERROR_ACCEPT_CONNECTION;
+        return CSLIB_EACCEPT_CONNECTION;
     }
 
     return s;
@@ -63,13 +63,13 @@ int cslib_clientSocket(char* ip, int port)
     if(cslib_getaddrinfo(ip, port, 0, &results) != 0)
     {
         freeaddrinfo(results);
-        return CSLIB_ERROR_ADDRESS_INFO_OBTENTION;
+        return CSLIB_EADDRESS_INFO_OBTENTION;
     }
 
     if(connect(s, results->ai_addr, results->ai_addrlen) == -1)
     {
         freeaddrinfo(results);
-        return CSLIB_ERROR_CONNECT_TO_SERVER;
+        return CSLIB_ECONNECT_TO_SERVER;
     }
 
     return s;
@@ -84,6 +84,8 @@ ssize_t cslib_receive(int sckt, char *msg, size_t bffr_size)
 {
     return read(sckt, msg, bffr_size);
 }
+
+
 
 // Internal functions
 

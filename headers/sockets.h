@@ -4,12 +4,12 @@
 #include <stddef.h>
 #include <unistd.h>
 
-#define CSLIB_ERROR_SOCKET_CREATION -1
-#define CSLIB_ERROR_ADDRESS_INFO_OBTENTION -2
-#define CSLIB_ERROR_SOCKET_BINDING -3
-#define CSLIB_ERROR_LISTENING_START -4
-#define CSLIB_ERROR_ACCEPT_CONNECTION -5
-#define CSLIB_ERROR_CONNECT_TO_SERVER -6
+#define CSLIB_ESOCKET_CREATION -1
+#define CSLIB_EADDRESS_INFO_OBTENTION -2
+#define CSLIB_ESOCKET_BINDING -3
+#define CSLIB_ELISTENING_START -4
+#define CSLIB_EACCEPT_CONNECTION -5
+#define CSLIB_ECONNECT_TO_SERVER -6
 
 /* Creates a socket and starts listening for any incoming connection on port */
 int cslib_serverSocket(int port);
@@ -25,5 +25,9 @@ ssize_t cslib_send(int sckt, const char* msg, size_t bffr_size);
 
 /* Reads bffr_size bytes from sckt and writes them in memory, then assigns msg to point to said memory */
 ssize_t cslib_receive(int sckt, char* msg, size_t bffr_size);
+
+
+
+const char* cslib_socketerror_str(int errorcode);
 
 #endif
