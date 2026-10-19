@@ -86,6 +86,19 @@ ssize_t cslib_receive(int sckt, char *msg, size_t bffr_size)
 }
 
 
+const char* cslib_socketerror_str(int errorcode)
+{
+    switch(errorcode)
+    {
+        case CSLIB_ESOCKET_CREATION: return "could not create socket";
+        case CSLIB_EADDRESS_INFO_OBTENTION: return "could not obtain address informations";
+        case CSLIB_ESOCKET_BINDING: return "could not bind socket";
+        case CSLIB_ELISTENING_START: return "could not start listening loop";
+        case CSLIB_EACCEPT_CONNECTION: return "could not accept connection";
+        case CSLIB_ECONNECT_TO_SERVER: return "connection failed";
+        default: return NULL;
+    }
+}
 
 // Internal functions
 
