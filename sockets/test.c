@@ -3,9 +3,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include "sockets.h"
 
-#define trace(format, ...) printf("[%d] " format "\n", getpid() __VA_OPT__(,) __VA_ARGS__)
+#define trace(format, ...) printf("[%d] %s: " format "\n", getpid(), header __VA_OPT__(,) __VA_ARGS__)
 #define traceError(errorcode) trace("Program encountered error %d: %s", errorcode, cslib_socketerror_str(errorcode))
 
 int server(const int port);
@@ -13,6 +14,12 @@ int client(const char* ip, const int port);
 void sigcont_handler(int);
 void sigint_handler(int);
 void sigsegv_handler(int);
+
+void abort_test(int errorcode);
+
+const char* header = "";
+const char* servHead = "[Server]";
+const char* clientHead = "[Client]";
 
 char ready = 0;
 
@@ -54,58 +61,73 @@ int main(int argc, char* argv[])
 
     if (child) 
     {
+        header = servHead;
         trace("Parent program, child: %d", child);
 
         self = parent;
         other = child;
 
         server(intPort);
+
+        int childReturnCode;
+        wait(&childReturnCode);
     }
 
     else
     {
+        header = clientHead;
         trace("Child program", );
+
         other = self;
         self = getpid();
+        
         client(ipAddress, intPort);
     }
+
+    trace("Program terminated, exiting", );
 
     return 0;
 }
 
 int server(const int port)
 {
-
-
     int listenSocket = cslib_serverSocket(port);
 
-    if(listenSocket < 0)
-    {
-        traceError(listenSocket);
+    if(listenSocket < 0) abort_test(listenSocket);
 
-        kill(other, SIGINT);
-
-        exit(0);
-    }
-
-    trace("Server listening on port %d with socket %d", port, listenSocket);
+    trace("Listening on port %d with socket %d", port, listenSocket);
     kill(other, SIGCONT);
 
     int servSocket = cslib_accept(listenSocket);
 
-    if(servSocket < 0)
-    {
-        traceError(servSocket);
-
-        kill(other, SIGINT);
-
-        exit(0);
-    }
+    if(servSocket < 0) abort_test(servSocket);
 
     trace("Program connected using socket %d", servSocket);
 
 
+    ssize_t readbytes;
 
+    size_t msgSize = 0;
+
+    char* msg = NULL;
+
+    while((readbytes = cslib_receive(servSocket, &msgSize, sizeof(size_t))))
+    {
+        trace("message size: %lu", msgSize);
+        msg = realloc(msg, msgSize+1); // add 1 to msgSize to add '\0' at the end of msg
+
+        msg[msgSize] = 0;
+
+        readbytes = cslib_receive(servSocket, msg, msgSize);
+
+        trace("Received: %s", msg);
+    }
+
+    trace("Connection terminated",);
+
+    free(msg);
+
+    kill(other, SIGCONT);
 
     return 0;
 }
@@ -113,6 +135,12 @@ int server(const int port)
 int client(const char* ip, const int port)
 {
     while(!ready) pause();
+
+    ready = 0;
+
+    int sckt = cslib_clientSocket(ip, port);
+
+    if(sckt < 0) abort_test(sckt);
 
     return 0;
 }
@@ -138,6 +166,16 @@ void sigsegv_handler(int signal)
     trace("Signal received: %d, signaling other program and quitting", signal);
 
     if(other) kill(other, SIGINT);
+
+    exit(0);
+}
+
+
+void abort_test(int errorcode)
+{
+    traceError(errorcode);
+
+    kill(other, SIGINT);
 
     exit(0);
 }
