@@ -8,7 +8,7 @@
 
 static int cslib_getaddrinfo(const char* host, const int port, const int hint_flags, struct addrinfo** results);
 
-int cslib_serverSocket(int port)
+int cslib_serverSocket(const int port)
 {
     int s = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -54,7 +54,7 @@ int cslib_accept(int srvrscket)
     return s;
 }
 
-int cslib_clientSocket(char* ip, int port)
+int cslib_clientSocket(const char* ip, const int port)
 {
     int s = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -75,18 +75,18 @@ int cslib_clientSocket(char* ip, int port)
     return s;
 }
 
-ssize_t cslib_send(int sckt, const char* msg, size_t bffr_size)
+ssize_t cslib_send(int sckt, const char* msg, const size_t bffr_size)
 {
     return write(sckt, msg, bffr_size);
 }
 
-ssize_t cslib_receive(int sckt, char *msg, size_t bffr_size)
+ssize_t cslib_receive(int sckt, char *msg, const size_t bffr_size)
 {
     return read(sckt, msg, bffr_size);
 }
 
 
-const char* cslib_socketerror_str(int errorcode)
+const char* cslib_socketerror_str(const int errorcode)
 {
     switch(errorcode)
     {

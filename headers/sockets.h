@@ -12,19 +12,19 @@
 #define CSLIB_ECONNECT_TO_SERVER -6
 
 /* Creates a socket and starts listening for any incoming connection on port */
-int cslib_serverSocket(int port);
+int cslib_serverSocket(const int port);
 
 /* Creates a service socket from a connection to the listening socket srvrscket */
 int cslib_accept(int srvrscket);
 
 /* Creates a socket and connects it to ip:port */
-int cslib_clientSocket(char* ip, int port);
+int cslib_clientSocket(const char* ip, const int port);
 
 /* Sends bffr_size bytes from msg to sckt*/
-ssize_t cslib_send(int sckt, const char* msg, size_t bffr_size);
+ssize_t cslib_send(int sckt, const char* msg, const size_t bffr_size);
 
 /* Reads bffr_size bytes from sckt and writes them in memory, then assigns msg to point to said memory */
-ssize_t cslib_receive(int sckt, char* msg, size_t bffr_size);
+ssize_t cslib_receive(int sckt, char* msg, const size_t bffr_size);
 
 
 
