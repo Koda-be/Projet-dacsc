@@ -75,12 +75,12 @@ int cslib_clientSocket(const char* ip, const int port)
     return s;
 }
 
-ssize_t cslib_send(int sckt, const char* msg, const size_t bffr_size)
+ssize_t cslib_send(int sckt, const void* msg, const size_t bffr_size)
 {
     return write(sckt, msg, bffr_size);
 }
 
-ssize_t cslib_receive(int sckt, char *msg, const size_t bffr_size)
+ssize_t cslib_receive(int sckt, void* msg, const size_t bffr_size)
 {
     return read(sckt, msg, bffr_size);
 }

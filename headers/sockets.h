@@ -21,10 +21,10 @@ int cslib_accept(int srvrscket);
 int cslib_clientSocket(const char* ip, const int port);
 
 /* Sends bffr_size bytes from msg to sckt*/
-ssize_t cslib_send(int sckt, const char* msg, const size_t bffr_size);
+ssize_t cslib_send(int sckt, const void* msg, const size_t bffr_size);
 
 /* Reads bffr_size bytes from sckt and writes them in memory, then assigns msg to point to said memory */
-ssize_t cslib_receive(int sckt, char* msg, const size_t bffr_size);
+ssize_t cslib_receive(int sckt, void* msg, const size_t bffr_size);
 
 
 
