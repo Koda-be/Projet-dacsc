@@ -57,15 +57,15 @@ int main(int argc, char* argv[])
 
     trace("forking", );
 
-    int child = fork();
+    int childpid = fork();
 
-    if (child) 
+    if (childpid) 
     {
         header = servHead;
-        trace("Parent program, child: %d", child);
+        trace("Parent program, child: %d", childpid);
 
         self = parent;
-        other = child;
+        other = childpid;
 
         server(intPort);
 
@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
         header = clientHead;
         trace("Child program", );
 
-        other = getppid();
+        other = parent;
         self = getpid();
         
         client(ipAddress, intPort);
