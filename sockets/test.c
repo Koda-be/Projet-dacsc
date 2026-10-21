@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
         header = clientHead;
         trace("Child program", );
 
-        other = self;
+        other = getppid();
         self = getpid();
         
         client(ipAddress, intPort);
@@ -149,7 +149,7 @@ int client(const char* ip, const int port)
 
 // Signal handlers
 
-void SIGCONT_handler(int signal)
+void sigcont_handler(int signal)
 {
     trace("Signal received: %d", signal);
     ready = 1;
