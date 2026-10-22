@@ -28,10 +28,10 @@ TESTS :=$(CTESTS)
 DACSC:	$(CSERVER) $(CCLIENT) tests
 
 
-$(CSERVER):	
+$(RELEASE)/$(CSERVER):	
 
 # Probably very stupid to call cmake inside a make target but oh well
-$(CCLIENT):	$(CCLIENT)/* $(OBJS)/sockets.o
+$(RELEASE)/$(CCLIENT):	$(CCLIENT)/* $(OBJS)/sockets.o
 			cmake -S $(CCLIENT) -B $(CMAKEBUILD)/$(CCLIENT)
 			cmake --build $(CMAKEBUILD)/$(CCLIENT)
 			mv $(CMAKEBUILD)/$(CCLIENT)/$(CCLIENT) $(RELEASE)
