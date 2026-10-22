@@ -61,3 +61,10 @@ compile_commands.json
 bin/debug/*
 bin/release/*
 objs/*
+
+ClientBookEncodeQt/**
+!ClientBookEncodeQt/CMakeLists.txt
+!ClientBookEncodeQt/main.cpp
+!ClientBookEncodeQt/mainwindowclientbookencoder.cpp
+!ClientBookEncodeQt/mainwindowclientbookencoder.h
+!ClientBookEncodeQt/ui_mainwindowclientbookencoder.h
