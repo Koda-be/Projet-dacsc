@@ -25,7 +25,7 @@ CTESTS :=$(patsubst %,$(DEBUG)/%.test,$(CMODULE_NAMES))
 TESTS :=$(CTESTS)
 
 #Main and generic targets
-DACSC:	$(CSERVER) $(CCLIENT) tests
+DACSC:	$(RELEASE)/$(CSERVER) $(RELEASE)/$(CCLIENT) tests
 
 
 $(RELEASE)/$(CSERVER):	
