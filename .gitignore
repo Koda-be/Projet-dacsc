@@ -62,9 +62,9 @@ bin/debug/*
 bin/release/*
 objs/*
 
-ClientBookEncodeQt/**
-!ClientBookEncodeQt/CMakeLists.txt
-!ClientBookEncodeQt/main.cpp
-!ClientBookEncodeQt/mainwindowclientbookencoder.cpp
-!ClientBookEncodeQt/mainwindowclientbookencoder.h
-!ClientBookEncodeQt/ui_mainwindowclientbookencoder.h
+ClientBookEncoderQt/**
+!ClientBookEncoderQt/CMakeLists.txt
+!ClientBookEncoderQt/main.cpp
+!ClientBookEncoderQt/mainwindowclientbookencoder.cpp
+!ClientBookEncoderQt/mainwindowclientbookencoder.h
+!ClientBookEncoderQt/ui_mainwindowclientbookencoder.h
