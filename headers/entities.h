@@ -27,8 +27,8 @@ typedef struct subject_
 typedef struct book_
 {
     int id;
-    int auth;
-    int subj;
+    author_t* auth;
+    subject_t* subj;
     int page_count;
     int stock_quantity;
     float price;
