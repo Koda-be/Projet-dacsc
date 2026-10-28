@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include "sockets.h"
+#include <errno.h>
 
 static int cslib_getaddrinfo(const char* host, const int port, const int hint_flags, struct addrinfo** results);
 
@@ -58,17 +59,24 @@ int cslib_clientSocket(const char* ip, const int port)
 {
     int s = socket(AF_INET, SOCK_STREAM, 0);
 
-    struct addrinfo* results;
+    if (s == -1)
+        return CSLIB_ESOCKET_CREATION;
 
-    if(cslib_getaddrinfo(ip, port, 0, &results) != 0)
+    struct addrinfo* results = NULL;
+
+    if (cslib_getaddrinfo(ip, port, 0, &results) != 0)
     {
-        freeaddrinfo(results);
+        close(s);
         return CSLIB_EADDRESS_INFO_OBTENTION;
     }
 
-    if(connect(s, results->ai_addr, results->ai_addrlen) == -1)
+    int status = connect(s, results->ai_addr, results->ai_addrlen);
+
+    freeaddrinfo(results);
+
+    if (status == -1)
     {
-        freeaddrinfo(results);
+        close(s);
         return CSLIB_ECONNECT_TO_SERVER;
     }
 
@@ -77,12 +85,72 @@ int cslib_clientSocket(const char* ip, const int port)
 
 ssize_t cslib_send(int sckt, const void* msg, const size_t bffr_size)
 {
-    return write(sckt, msg, bffr_size);
+    return send(sckt, msg, bffr_size, MSG_NOSIGNAL);
+
+}
+ssize_t cslib_sendAll(int sckt, const void* buffer, size_t length)
+{
+    size_t total = 0;
+
+    while (total < length)
+    {
+        ssize_t n = cslib_send(
+            sckt,
+            (const char*)buffer + total,
+            length - total
+        );
+
+        if (n < 0)
+        {
+            if (errno == EINTR)
+                continue;
+
+            return -1;
+        }
+
+        if (n == 0)
+        {
+            errno = EPIPE;
+            return -1;
+        }
+
+        total += (size_t)n;
+    }
+
+    return (ssize_t)total;
 }
 
 ssize_t cslib_receive(int sckt, void* msg, const size_t bffr_size)
 {
     return read(sckt, msg, bffr_size);
+}
+ssize_t cslib_receiveExact(int sckt, void* buffer, size_t length)
+{
+    size_t total = 0;
+
+    while (total < length)
+    {
+        ssize_t n = cslib_receive(
+            sckt,
+            (char*)buffer + total,
+            length - total
+        );
+
+        if (n == 0)
+            return 0;
+
+        if (n < 0)
+        {
+            if (errno == EINTR)
+                continue;
+
+            return -1;
+        }
+
+        total += (size_t)n;
+    }
+
+    return (ssize_t)total;
 }
 
 
@@ -142,4 +210,32 @@ static int cslib_getaddrinfo(const char* host, const int port, const int hint_fl
     free(portstr);
     
     return retval;
+}
+
+int cslib_setTimeouts(int sckt, int seconds)
+{
+    if (sckt < 0 || seconds <= 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    struct timeval timeout;
+
+    timeout.tv_sec = seconds;
+    timeout.tv_usec = 0;
+
+    if (setsockopt(sckt, SOL_SOCKET, SO_RCVTIMEO,
+                   &timeout, sizeof(timeout)) == -1)
+    {
+        return -1;
+    }
+
+    if (setsockopt(sckt, SOL_SOCKET, SO_SNDTIMEO,
+                   &timeout, sizeof(timeout)) == -1)
+    {
+        return -1;
+    }
+
+    return 0;
 }
