@@ -4,6 +4,7 @@
 #include <QInputDialog>
 #include <QMessageBox>
 #include <iostream>
+#include <QLineEdit>
 
 extern "C" {
     #include "sockets.h"
@@ -285,6 +286,36 @@ void MainWindowClientBookEncoder::on_actionLogin_triggered()
         return;
     }
 
+    bool confirme = false;
+
+    QString login = QInputDialog::getText(
+        this,
+        "Entrée en session",
+        "Login ?",
+        QLineEdit::Normal,
+        "",
+        &confirme
+    );
+
+    if (!confirme || login.isEmpty())
+        return;
+
+    QString password = QInputDialog::getText(
+        this,
+        "Entrée en session",
+        "Mot de passe ?",
+        QLineEdit::Password,
+        "",
+        &confirme
+    );
+
+    if (!confirme || password.isEmpty())
+        return;
+
+    // Les identifiants seront utilisés lors de l'envoi OBEP.
+    Q_UNUSED(login);
+    Q_UNUSED(password);
+
     socketServeur = cslib_clientSocket("127.0.0.1", 45678);
 
     if (socketServeur < 0)
@@ -292,6 +323,15 @@ void MainWindowClientBookEncoder::on_actionLogin_triggered()
         this->dialogError("Connexion impossible",
                           cslib_socketerror_str(socketServeur));
 
+        socketServeur = -1;
+        return;
+    }
+
+    if (cslib_setTimeouts(socketServeur, 5) == -1)
+    {
+        this->dialogError("Connexion", "Impossible de configurer les timeouts.");
+
+        ::close(socketServeur);
         socketServeur = -1;
         return;
     }
