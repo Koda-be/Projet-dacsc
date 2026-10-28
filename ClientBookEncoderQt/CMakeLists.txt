@@ -12,6 +12,7 @@ add_executable(ClientBookEncoderQt
     mainwindowclientbookencoder.cpp
     mainwindowclientbookencoder.h
     ../sockets/sockets.c
+    ../obep/transport.c
 )
 
 target_include_directories(ClientBookEncoderQt PRIVATE
