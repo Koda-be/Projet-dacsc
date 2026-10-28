@@ -17,7 +17,7 @@ CSERVER=cserver
 CCLIENT=ClientBookEncoderQt
 
 #Module languages specifications
-CMODULE_NAMES :=sockets
+CMODULE_NAMES :=sockets obep
 CMODULES := $(patsubst %,$(RELEASE)/%,$(CMODULE_NAMES))
 
 #Test
@@ -73,6 +73,9 @@ $(OBJS)/test_%.o:	$$(MODNAME)/test.c $(HEADERS)/$$(MODNAME).h
 
 $(DEBUG)/sockets.test:	$(OBJS)/debug_sockets.o $(OBJS)/test_sockets.o
 			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $(DEBUG)/sockets.test
+
+$(DEBUG)/obep.test:		$(OBJS)/debug_obep.o $(OBJS)/test_obep.o
+			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $(DEBUG)/obep.test
 
 
 #phony targets
