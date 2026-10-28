@@ -49,7 +49,14 @@ MainWindowClientBookEncoder::MainWindowClientBookEncoder(QWidget *parent)
     this->addComboBoxSubjects("Science-fiction");
 }
 
-MainWindowClientBookEncoder::~MainWindowClientBookEncoder() {
+MainWindowClientBookEncoder::~MainWindowClientBookEncoder()
+{
+    if (socketServeur >= 0)
+    {
+        ::close(socketServeur);
+        socketServeur = -1;
+    }
+
     delete ui;
 }
 
@@ -270,10 +277,27 @@ void MainWindowClientBookEncoder::on_pushButtonClear_clicked() {
     ui->spinBoxStockQuantity->setValue(0);
 }
 
-void MainWindowClientBookEncoder::on_actionLogin_triggered() {
-    string login = this->dialogInputText("Entrée en session","Login ?");
-    string password = this->dialogInputText("Entrée en session","Password ?");
-    this->loginOk();
+void MainWindowClientBookEncoder::on_actionLogin_triggered()
+{
+    if (socketServeur >= 0)
+    {
+        this->dialogMessage("Connexion", "Une connexion TCP existe deja.");
+        return;
+    }
+
+    socketServeur = cslib_clientSocket("127.0.0.1", 45678);
+
+    if (socketServeur < 0)
+    {
+        this->dialogError("Connexion impossible",
+                          cslib_socketerror_str(socketServeur));
+
+        socketServeur = -1;
+        return;
+    }
+
+    this->dialogMessage("Connexion",
+                        "Connexion TCP etablie. Authentification OBEP non effectuee.");
 }
 
 void MainWindowClientBookEncoder::on_actionLogout_triggered() {

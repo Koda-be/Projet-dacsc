@@ -53,5 +53,6 @@ private slots:
 
 private:
     Ui::MainWindowClientBookEncoder *ui;
+    int socketServeur = -1;
 };
 #endif // MAINWINDOWCLIENTBOOKENCODER_H
