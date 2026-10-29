@@ -91,11 +91,11 @@ ssize_t cslib_send(int sckt, const void* msg, const size_t bffr_size)
 
     while (total < bffr_size)
     {
-        ssize_t n = cslib_send(
+        ssize_t n = send(
             sckt,
             (const char*) msg + total,
-            bffr_size - total
-        );
+            bffr_size - total,
+            0);
 
         if (n < 0)
         {
@@ -120,7 +120,31 @@ ssize_t cslib_send(int sckt, const void* msg, const size_t bffr_size)
 
 ssize_t cslib_receive(int sckt, void* msg, const size_t bffr_size)
 {
-    return read(sckt, msg, bffr_size);
+    size_t total = 0;
+
+    while (total < bffr_size)
+    {
+        ssize_t n = recv(
+            sckt,
+            (char*)msg + total,
+            bffr_size - total,
+            0);
+
+        if (n == 0)
+            return 0;
+
+        if (n < 0)
+        {
+            if (errno == EINTR)
+                continue;
+
+            return -1;
+        }
+
+        total += (size_t)n;
+    }
+
+    return (ssize_t)total;
 }
 
 
