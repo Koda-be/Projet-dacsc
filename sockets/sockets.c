@@ -1,9 +1,11 @@
 #include <stdio.h>
+#include <threads.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <errno.h>
 #include "sockets.h"
 
 static int cslib_getaddrinfo(const char* host, const int port, const int hint_flags, struct addrinfo** results);
@@ -12,30 +14,36 @@ int cslib_serverSocket(const int port)
 {
     int s = socket(AF_INET, SOCK_STREAM, 0);
 
-    if(s == -1) return CSLIB_ESOCKET_CREATION;
+    if(s == -1)
+    {
+        errno = CSLIB_ESOCKET_CREATION;
+        return -1;
+    } 
 
     struct addrinfo *results;
 
 
     if(cslib_getaddrinfo(NULL, port, AI_PASSIVE,&results) != 0)
     {
-
         close(s);
         freeaddrinfo(results);
-        return CSLIB_EADDRESS_INFO_OBTENTION;
+        errno = CSLIB_EADDRESS_INFO_OBTENTION;
+        return -1;
     }
 
     if(bind(s, results->ai_addr, results->ai_addrlen) < 0)
     {
         freeaddrinfo(results);
-        return CSLIB_ESOCKET_BINDING;
+        errno = CSLIB_ESOCKET_BINDING;
+        return -1;
     }
     freeaddrinfo(results);
 
     if(listen(s, SOMAXCONN) == -1) 
     {
         close(s);
-        return CSLIB_ELISTENING_START;
+        errno = CSLIB_ELISTENING_START;
+        return -1;
     } 
 
     return s;
@@ -48,7 +56,8 @@ int cslib_accept(int srvrscket)
     if(s == -1)
     {
         close(s);
-        return CSLIB_EACCEPT_CONNECTION;
+        errno = CSLIB_EACCEPT_CONNECTION;
+        return -1;
     }
 
     return s;
@@ -63,13 +72,14 @@ int cslib_clientSocket(const char* ip, const int port)
     if(cslib_getaddrinfo(ip, port, 0, &results) != 0)
     {
         freeaddrinfo(results);
-        return CSLIB_EADDRESS_INFO_OBTENTION;
+        errno = CSLIB_EADDRESS_INFO_OBTENTION;
+        return -1;
     }
 
     if(connect(s, results->ai_addr, results->ai_addrlen) == -1)
     {
         freeaddrinfo(results);
-        return CSLIB_ECONNECT_TO_SERVER;
+        errno = CSLIB_ECONNECT_TO_SERVER;
     }
 
     return s;
@@ -77,7 +87,35 @@ int cslib_clientSocket(const char* ip, const int port)
 
 ssize_t cslib_send(int sckt, const void* msg, const size_t bffr_size)
 {
-    return write(sckt, msg, bffr_size);
+    size_t total = 0;
+
+    while (total < bffr_size)
+    {
+        ssize_t n = cslib_send(
+            sckt,
+            (const char*) msg + total,
+            bffr_size - total
+        );
+
+        if (n < 0)
+        {
+            if (errno == EINTR)
+                continue;
+
+            return -1;
+        }
+
+        if (n == 0)
+        {
+            errno = EPIPE;
+            return -1;
+        }
+
+        total += (size_t)n;
+
+    }
+
+    return (ssize_t)total;
 }
 
 ssize_t cslib_receive(int sckt, void* msg, const size_t bffr_size)
@@ -96,7 +134,7 @@ const char* cslib_socketerror_str(const int errorcode)
         case CSLIB_ELISTENING_START: return "could not start listening loop";
         case CSLIB_EACCEPT_CONNECTION: return "could not accept connection";
         case CSLIB_ECONNECT_TO_SERVER: return "connection failed";
-        default: return NULL;
+        default: return strerror(errorcode);
     }
 }
 
