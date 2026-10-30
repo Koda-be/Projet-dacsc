@@ -1,10 +1,9 @@
 #ifndef __OBEP_H_
 #define __OBEP_H_
 
-#include "entities.h"
 #include <stddef.h>
 
-#define OBEP__HEADER_LENGTH 17
+#define OBEP__HEADER_LENGTH 24
 
 typedef enum
 {
@@ -25,6 +24,7 @@ typedef enum
 
 typedef enum
 {
+    obep_norslt,
     obep_success,
     obep_failure
 } obep_rqst_rslt_t;
@@ -41,6 +41,8 @@ typedef struct obep_rqst_
 {
     obep_rqst_type_t rqst_type;
     obep_msg_type_t msg_type;
+    obep_rqst_rslt_t rqst_rslt;
+    int argc;
     void* arg;
 } obep_rqst_t;
 
