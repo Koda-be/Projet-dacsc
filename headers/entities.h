@@ -9,6 +9,8 @@
 #define subj_name_max_len 20
 #define book_isbn_max_len 20
 #define book_title_max_len 100
+#define employee_login_max_len 20
+#define employee_password_max_len 20
 
 typedef struct author_
 {
@@ -49,8 +51,8 @@ typedef struct book_
 typedef struct employee_
 {
     int id;
-    char* login;
-    char* pswd;
+    char login[employee_login_max_len];
+    char* pswd[employee_password_max_len];
 } employee_t;
 
 #endif
