@@ -7,7 +7,7 @@
 
 typedef enum
 {
-    obep_login,
+    obep_login = 1,
     obep_logout,
     obep_get_auth,
     obep_get_subj,
@@ -18,13 +18,13 @@ typedef enum
 
 typedef enum
 {
-    obep_req,
+    obep_req = 1,
     obep_ans
 } obep_msg_type_t;
 
 typedef enum
 {
-    obep_norslt,
+    obep_norslt = 1,
     obep_success,
     obep_failure
 } obep_rqst_rslt_t;

@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,7 +60,12 @@ static char* get_add_book_str(const book_t* book);
 static const char* rqst_type_str(const obep_rqst_type_t rqst);
 static const char* msg_type_str(const obep_msg_type_t msg);
 static const char* rqst_rslt_str(const obep_rqst_rslt_t rslt);
+static obep_rqst_type_t str_to_rqst_type(const char* str);
+static obep_msg_type_t  str_to_msg_type(const char* str);
+static obep_rqst_rslt_t str_to_rqst_rslt(const char* str);
 
+
+// Request to message parsing
 
 obep_msg_t* obep_get_msg(const obep_rqst_t* rqst)
 {
@@ -240,6 +246,34 @@ char* get_add_book_str(const book_t* book)
     return str;
 }
 
+
+// Message to request conversion
+
+obep_rqst_t* obep_get_rqst(const obep_msg_t* msg)
+{
+    obep_rqst_t* rqst = malloc(sizeof(obep_rqst_t));
+    char    rqst_t_str[8] = {0},
+            msg_t_str[8] = {0},
+            rslt_str[8] = {0};
+
+    sscanf(msg->header, "%*zX|%7s|%2s|%7s", rqst_t_str, msg_t_str, rslt_str);
+
+    rqst->rqst_type = str_to_rqst_type(rqst_t_str);
+    rqst->msg_type = str_to_msg_type(msg_t_str);
+    rqst->rqst_rslt = str_to_rqst_rslt(rslt_str);
+
+    
+
+    return rqst;
+}
+
+size_t obep_get_msg_size(obep_msg_t *msg)
+{
+    size_t size = 0;
+
+    sscanf(msg->header, "%zX", &size);
+}
+
 const char* rqst_type_str(const obep_rqst_type_t rqst)
 {
     switch(rqst)
@@ -274,4 +308,31 @@ const char* rqst_rslt_str(const obep_rqst_rslt_t rslt)
         case obep_failure:  return FAIL_STR;
         default: return NULL;
     }
+}
+
+obep_rqst_type_t str_to_rqst_type(const char* str)
+{
+    if(!strcmp(str, LOGIN_STR)) return obep_login;
+    if(!strcmp(str, LOGOUT_STR)) return obep_logout;
+    if(!strcmp(str, GETAUTH_STR)) return obep_get_auth;
+    if(!strcmp(str, GETSUBJ_STR)) return obep_get_subj;
+    if(!strcmp(str, ADDAUTH_STR)) return obep_add_auth;
+    if(!strcmp(str, ADDSUBJ_STR)) return obep_add_subj;
+    if(!strcmp(str, ADDBOOK_STR)) return obep_add_book;
+    return 0;
+}
+
+obep_msg_type_t str_to_msg_type(const char* str)
+{
+    if(!strcmp(str, REQ_STR)) return obep_req;
+    if(!strcmp(str, ANS_STR)) return obep_ans;
+    return 0;
+}
+
+obep_rqst_rslt_t str_to_rqst_rslt(const char* str)
+{
+    if(!strcmp(str, NORSLT_STR)) return obep_norslt;
+    if(!strcmp(str, SUCC_STR)) return obep_success;
+    if(!strcmp(str, FAIL_STR)) return obep_failure;
+    return 0;
 }
