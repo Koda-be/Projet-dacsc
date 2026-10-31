@@ -52,7 +52,7 @@ typedef struct employee_
 {
     int id;
     char login[employee_login_max_len];
-    char* pswd[employee_password_max_len];
+    char pswd[employee_password_max_len];
 } employee_t;
 
 #endif
