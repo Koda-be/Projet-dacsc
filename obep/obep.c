@@ -22,7 +22,7 @@ static const char* FAIL_STR =   "FAILURE";
 
 // Employee field strings
 #define LOGIN "login"
-#define PASSWORD "password:"
+#define PASSWORD "password"
 
 // Author field strings
 #define LNAME "lastname:"
@@ -57,6 +57,10 @@ static char* get_add_auth_str(const author_t* author);
 static char* get_add_subj_str(const subject_t* subject);
 static char* get_add_book_str(const book_t* book);
 
+//static int req_msg_to_arg(obep_rqst_t* rqst, const obep_msg_t* msg);
+//static int ans_msg_to_arg(obep_rqst_t* rqst, const obep_msg_t* msg);
+
+
 static const char* rqst_type_str(const obep_rqst_type_t rqst);
 static const char* msg_type_str(const obep_msg_type_t msg);
 static const char* rqst_rslt_str(const obep_rqst_rslt_t rslt);
@@ -71,20 +75,26 @@ obep_msg_t* obep_get_msg(const obep_rqst_t* rqst)
 {
     obep_msg_t* msg = (obep_msg_t*) malloc(sizeof(obep_msg_t));
 
-    char* (* get_arg_str) (const obep_rqst_t* rqst);
+    char* (* get_arg_str) (const obep_rqst_t* rqst) = NULL;
 
     get_arg_str = ((rqst->msg_type == obep_req )? req_get_arg_str : ans_get_arg_str);
 
-    char* arg = get_arg_str(rqst);
+    char* arg = (get_arg_str != NULL ? get_arg_str(rqst) : NULL);
 
-    size_t argsize = strlen(arg);
-    msg->msg = malloc(argsize+1);
+    size_t argsize = 0;
 
-    strncpy(msg->msg, arg, argsize);
-    free(arg);
+    if(arg == NULL) msg->msg = NULL;
+    else
+    {
+        argsize = strlen(arg);
+        msg->msg = malloc(argsize+1);
+
+        strncpy(msg->msg, arg, argsize);
+        free(arg);
+    }
     
     sprintf(msg->header,    "%.4X|%.7s|%.2s|%.7s", 
-                            (int) argsize, 
+                            (int) argsize+1,    // To include the \O 
                             rqst_type_str(rqst->rqst_type),
                             msg_type_str(rqst->msg_type),
                             rqst_rslt_str(rqst->rqst_rslt));
@@ -256,7 +266,7 @@ obep_rqst_t* obep_get_rqst(const obep_msg_t* msg)
             msg_t_str[8] = {0},
             rslt_str[8] = {0};
 
-    sscanf(msg->header, "%*zX|%7s|%2s|%7s", rqst_t_str, msg_t_str, rslt_str);
+    sscanf(msg->header, "%*4X|%7s|%2s|%7s", rqst_t_str, msg_t_str, rslt_str);
 
     rqst->rqst_type = str_to_rqst_type(rqst_t_str);
     rqst->msg_type = str_to_msg_type(msg_t_str);
@@ -272,6 +282,8 @@ size_t obep_get_msg_size(obep_msg_t *msg)
     size_t size = 0;
 
     sscanf(msg->header, "%zX", &size);
+
+    return size;
 }
 
 const char* rqst_type_str(const obep_rqst_type_t rqst)
