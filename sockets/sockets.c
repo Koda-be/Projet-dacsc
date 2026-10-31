@@ -80,6 +80,7 @@ int cslib_clientSocket(const char* ip, const int port)
     {
         freeaddrinfo(results);
         errno = CSLIB_ECONNECT_TO_SERVER;
+        return -1;
     }
 
     return s;
