@@ -132,8 +132,11 @@ ssize_t cslib_receive(int sckt, void* msg, const size_t bffr_size)
             0);
 
         if (n == 0)
+        {
+            if(total) errno = CSLIB_EINCOMPLETE_RECEPTION;
             return 0;
-
+        }
+        
         if (n < 0)
         {
             if (errno == EINTR)

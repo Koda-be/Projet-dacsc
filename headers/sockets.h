@@ -4,12 +4,13 @@
 #include <stddef.h>
 #include <unistd.h>
 
-#define CSLIB_ESOCKET_CREATION -1
-#define CSLIB_EADDRESS_INFO_OBTENTION -2
-#define CSLIB_ESOCKET_BINDING -3
-#define CSLIB_ELISTENING_START -4
-#define CSLIB_EACCEPT_CONNECTION -5
-#define CSLIB_ECONNECT_TO_SERVER -6
+#define CSLIB_ESOCKET_CREATION 135
+#define CSLIB_EADDRESS_INFO_OBTENTION 136
+#define CSLIB_ESOCKET_BINDING 137
+#define CSLIB_ELISTENING_START 138
+#define CSLIB_EACCEPT_CONNECTION 139
+#define CSLIB_ECONNECT_TO_SERVER 140
+#define CSLIB_EINCOMPLETE_RECEPTION 141
 
 /* Creates a socket and starts listening for any incoming connection on port */
 int cslib_serverSocket(const int port);
