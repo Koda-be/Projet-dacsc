@@ -1,13 +1,14 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "obep.h"
 #include "entities.h"
 
-int printrqst(obep_rqst_t* rqst);
-int printmsg(obep_msg_t* msg);
-int printauthor(author_t* auth);
-int printsubject(subject_t* subj);
-int printbook(book_t* book);
-int printemployee(employee_t* empl);
+int printrqst(void* arg);
+int printmsg(void* arg);
+int printauthor(void* arg);
+int printsubject(void* arg);
+int printbook(void* arg);
+int printemployee(void* arg);
 
 static const char* rqst_type_str(const obep_rqst_type_t rqst);
 static const char* msg_type_str(const obep_msg_type_t msg);
@@ -37,41 +38,93 @@ subject_t subjects[] = {
 
 #define BOOKS_COUNT 2
 book_t books[] = {
-    {1, 1, {&authors[3]}, {&subjects[5]}, 130, 3, 4.99f, 1450, "The bibble", "000-000-001 or smth"},
+    {1, 1, {&authors[2]}, {&subjects[5]}, 130, 3, 4.99f, 1450, "The bibble", "000-000-001 or smth"},
     {2, 0, {.auth_id = 4}, {.subj_id = 3}, 197, 5, 7.49f, 1920, "Radiation kills", "928387218393798237"}
 };
 
 int main(void)
 {
-    
+    employee_t bob = {-1, "Bob", "Bob123"};
+
+    #define rqsts_count 8
+    obep_rqst_t send_rqsts[rqsts_count] = {
+        {obep_login, obep_req, obep_norslt, 1, &bob},
+        {obep_logout, obep_req, obep_norslt, 0, NULL},
+        {obep_get_auth, obep_req, obep_norslt, 0, NULL},
+        {obep_get_subj, obep_req, obep_norslt, 0, NULL},
+        {obep_add_auth, obep_req, obep_norslt, 1, (void*) &authors[2]},
+        {obep_add_subj, obep_req, obep_norslt, 1, (void*) &subjects[2]},
+        {obep_add_book, obep_req, obep_norslt, 1, (void*) &books[0]},
+        {obep_add_book, obep_req, obep_norslt, 1, (void*) &books[1]}
+    };
+
+    int (*printarg[rqsts_count]) (void* object) = {
+        (int (*) (void*))printemployee, 
+            NULL, 
+            NULL,
+            NULL,
+            printauthor,
+            printsubject,
+            printbook,
+            printbook
+        };
+
+    obep_msg_t* send_msgs[rqsts_count] = {0};
+
+    for(int i = 0; i < rqsts_count; i++)
+    {
+        send_msgs[i] = obep_get_msg(&(send_rqsts[i]));
+        printf("rqst %d: ", i);
+        printrqst(&send_rqsts[i]);
+        if(printarg[i] != NULL)
+        {
+            printf("\n\twith arg:   ");
+            printarg[i](send_rqsts[i].arg);
+        }
+
+        printf("\n\n\tproduced msg: ");
+        printmsg(send_msgs[i]);
+        printf("\n\n\n");
+    }
+
+    for(int i = 0; i < rqsts_count; i++)
+    {
+        free(send_msgs[i]->msg);
+        free(send_msgs[i]);
+    }
 
     return 0;
 }
 
 
 
-int printrqst(obep_rqst_t* rqst)
+int printrqst(void* arg)
 {
+    obep_rqst_t* rqst = (obep_rqst_t*) arg;
     return printf("REQUEST: rqst type: %s, msg type: %s, rslt type: %s, argc: %d", rqst_type_str(rqst->rqst_type), msg_type_str(rqst->msg_type), rqst_rslt_str(rqst->rqst_rslt), rqst->argc);
 }
 
-int printmsg(obep_msg_t* msg)
+int printmsg(void* arg)
 {
+    obep_msg_t* msg = (obep_msg_t*) arg;
     return printf("MESSAGE: %." tostr(OBEP__HEADER_LENGTH) "s%s", msg->header, msg->msg);
 }
 
-int printauthor(author_t* auth)
+int printauthor(void* arg)
 {
+    author_t* auth = (author_t*) arg;
     return printf("AUTHOR: ID: %d, lname: %s, fname: %s, bdate: %s", auth->id, auth->last_name, auth->first_name, auth->birth_date);
 }
 
-int printsubject(subject_t* subj)
+int printsubject(void* arg)
 {
+    subject_t* subj = (subject_t*) arg;
     return printf("SUBJECT: ID: %d, name: %s", subj->id, subj->name);
 }
 
-int printbook(book_t* book)
+int printbook(void* arg)
 {
+    book_t* book = (book_t*) arg;
     return printf("BOOK: ID: %d, processed: %d, author_id: %d, subject_id: %d, pages: %d, stock: %d, price: %f, publish year: %d, title: %s, ISBN: %s",
                     book->id, book->processed, 
                     (book->processed ? book->auth.auth->id : book->auth.auth_id),
@@ -80,8 +133,9 @@ int printbook(book_t* book)
                     book->publish_year, book->title, book->isbn);
 }
 
-int printemployee(employee_t* empl)
+int printemployee(void* arg)
 {
+    employee_t* empl = (employee_t*) arg;
     return printf("EMPLOYEE: ID: %d, login: %s, password: %s", empl->id, empl->login, empl->pswd);
 }
 
