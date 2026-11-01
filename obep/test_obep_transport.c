@@ -22,8 +22,8 @@ int main(void)
     // Construire une trame OBEP de test
     obep_msg_t envoye = {0};
 
-    memcpy(envoye.header, "0005|LOGIN  |REQ#",
-           OBEP__HEADER_LENGTH);
+    memcpy(envoye.header, "0005|LOGIN  |RE|       #",
+       OBEP__HEADER_LENGTH);
 
     envoye.msg = "hello";
 

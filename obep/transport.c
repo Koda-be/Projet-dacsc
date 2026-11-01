@@ -24,7 +24,8 @@ int obep_send_frame(int socket, const obep_msg_t* message)
     if (errno != 0 || fin != longueurHex + 4 ||
         message->header[4] != '|' ||
         message->header[12] != '|' ||
-        message->header[16] != '#' ||
+        message->header[15] != '|' ||
+        message->header[OBEP__HEADER_LENGTH - 1] != '#'||
         (longueur > 0 && message->msg == NULL))
     {
         errno = EINVAL;
@@ -71,7 +72,8 @@ int obep_receive_frame(int socket, obep_msg_t* message)
     // 2. Verifier les separateurs de l'en-tete
     if (recu.header[4] != '|' ||
         recu.header[12] != '|' ||
-        recu.header[16] != '#')
+        recu.header[15] != '|' ||
+        recu.header[OBEP__HEADER_LENGTH - 1] != '#')
     {
         errno = EPROTO;
         return -1;
