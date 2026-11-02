@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <errno.h>
 #include "sockets.h"
 
 #define trace(format, ...) printf("[%d] %s: " format "\n", getpid(), header __VA_OPT__(,) __VA_ARGS__)
@@ -109,14 +110,14 @@ int server(const int port)
 {
     listenSocket = cslib_serverSocket(port);
 
-    if(listenSocket < 0) abort_test(listenSocket);
+    if(listenSocket < 0) abort_test(errno);
 
     trace("Listening on port %d with socket %d", port, listenSocket);
     kill(other, SIGCONT);
 
     servSocket = cslib_accept(listenSocket);
 
-    if(servSocket < 0) abort_test(servSocket);
+    if(servSocket < 0) abort_test(errno);
 
     trace("Program connected using socket %d", servSocket);
 
@@ -162,7 +163,7 @@ int client(const char* ip, const int port)
 
     sckt = cslib_clientSocket(ip, port);
 
-    if(sckt < 0) abort_test(sckt);
+    if(sckt < 0) abort_test(errno);
 
     char input[MAXINPUTLENGTH];
 
