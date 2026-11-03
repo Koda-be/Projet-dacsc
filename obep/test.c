@@ -55,7 +55,7 @@ int main(void)
         {obep_add_auth, obep_req, obep_norslt, 1, (void*) &authors[2]},
         {obep_add_subj, obep_req, obep_norslt, 1, (void*) &subjects[2]},
         {obep_add_book, obep_req, obep_norslt, 1, (void*) &books[0]},
-        {obep_add_book, obep_req, obep_norslt, 1, (void*) &books[1]}
+        {obep_add_book, obep_req, obep_norslt, 1, (void*) &books[1]},
     };
 
     int (*printarg[rqsts_count]) (void* object) = {
@@ -69,7 +69,9 @@ int main(void)
             printbook
         };
 
-    obep_msg_t* send_msgs[rqsts_count] = {0};
+    obep_msg_t* send_msgs[rqsts_count] = {NULL};
+
+    obep_rqst_t* recv_rqsts[rqsts_count] = {NULL};
 
     for(int i = 0; i < rqsts_count; i++)
     {
@@ -84,6 +86,124 @@ int main(void)
 
         printf("\n\n\tproduced msg: ");
         printmsg(send_msgs[i]);
+        printf("\n\n\tformed reqest: ");
+    
+        recv_rqsts[i] = obep_get_rqst(send_msgs[i]);
+        printrqst(recv_rqsts[i]);
+        if(printarg[i]!= NULL)
+        {
+            printf("\n\twith arg:   ");
+            printarg[i](recv_rqsts[i]->arg);
+        }
+
+        printf("\n\n\n");
+    }
+
+    obep_rqst_t ans;
+
+
+    int (*printansarg) (void*) = NULL; 
+
+    printf("\n\n\n Testing answers:\n\n");
+
+    for(int i = 0; i < rqsts_count; i++)
+    {
+        obep_rqst_t* rcvd = recv_rqsts[i];
+
+        switch(rcvd->rqst_type)
+        {
+            case obep_login: 
+                ans.rqst_type = obep_login;
+                ans.rqst_rslt = obep_success;
+                ans.msg_type = obep_ans;
+                ans.argc = 0;
+                ans.arg = NULL;
+                break;
+            case obep_logout:
+                ans.rqst_type = obep_logout;
+                ans.rqst_rslt = obep_failure;
+                ans.msg_type = obep_ans;
+                ans.argc = 0;
+                ans.arg = NULL;
+                break;
+            case obep_get_auth:
+                ans.rqst_type = obep_get_auth;
+                ans.rqst_rslt = obep_success;
+                ans.msg_type = obep_ans;
+                ans.arg = authors;
+                ans.argc = AUTHORS_COUNT;
+                printansarg = printauthor;
+                break;
+            case obep_get_subj:
+                ans.rqst_type = obep_get_subj;
+                ans.rqst_rslt = obep_success;
+                ans.msg_type = obep_ans;
+                ans.arg = subjects;
+                ans.argc = SUBJECTS_COUNT;
+                printansarg = printsubject;
+                break;
+            case obep_add_auth:
+                ans.rqst_type = obep_login;
+                ans.rqst_rslt = obep_success;
+                ans.msg_type = obep_ans;
+                ans.argc = 0;
+                ans.arg = NULL;
+                break;
+            case obep_add_subj:
+                ans.rqst_type = obep_add_subj;
+                ans.rqst_rslt = obep_success;
+                ans.msg_type = obep_ans;
+                ans.argc = 0;
+                ans.arg = NULL;
+                break;
+            case obep_add_book:
+                ans.rqst_type = obep_add_book;
+                ans.rqst_rslt = obep_success;
+                ans.msg_type = obep_ans;
+                ans.argc = 0;
+                ans.arg = NULL;
+                break;
+        }
+
+        printf("rqst %d: ", i);
+
+        printrqst(&ans);
+
+        if(printansarg != NULL)
+        {
+            printf("\n\twith arg:   ");
+            for(int i = 0; i < ans.argc; i++)
+            {
+                printf("\n\t");
+                printansarg((void*) (ans.rqst_type == obep_get_auth ? (void*) &((author_t*) (ans.arg))[i] : (void*) &((subject_t*) (ans.arg))[i]));
+            }
+        }
+
+        obep_msg_t* ansmsg = obep_get_msg(&ans);
+
+        printf("\nreturned with msg: ");
+        printmsg(ansmsg);
+        printf("\n\nproduced request: ");
+
+        obep_rqst_t* recvdans = obep_get_rqst(ansmsg);
+
+        printrqst(recvdans);
+
+        if(printansarg != NULL)
+        {
+            printf("\n\twith arg:   ");
+            for(int i = 0; i < recvdans->argc; i++)
+            {
+                printf("\n\t");
+                printansarg((void*) (recvdans->rqst_type == obep_get_auth ? (void*) &((author_t*) (recvdans->arg))[i] : (void*) &((subject_t*) (recvdans->arg))[i]));
+            }
+        }
+
+        free(recvdans->arg);
+        free(recvdans);
+        free(ansmsg->msg);
+        free(ansmsg);
+
         printf("\n\n\n");
     }
 
