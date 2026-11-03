@@ -49,6 +49,6 @@ typedef struct obep_rqst_
 obep_msg_t* obep_get_msg(const obep_rqst_t* rqst);
 obep_rqst_t* obep_get_rqst(const obep_msg_t* msg);
 
-size_t obep_get_msg_size(obep_msg_t* msg);
+size_t obep_get_msg_size(const obep_msg_t* msg);
 
 #endif

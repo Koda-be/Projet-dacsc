@@ -3,27 +3,27 @@
 
 #include <stddef.h>
 
-#define auth_fname_max_len 20
-#define auth_lname_max_len 20
-#define auth_bdate_max_len 20
-#define subj_name_max_len 20
-#define book_isbn_max_len 20
-#define book_title_max_len 100
-#define employee_login_max_len 20
-#define employee_password_max_len 20
+#define auth_fname_max_len 19
+#define auth_lname_max_len 19
+#define auth_bdate_max_len 19
+#define subj_name_max_len 19
+#define book_isbn_max_len 19
+#define book_title_max_len 99
+#define employee_login_max_len 19
+#define employee_password_max_len 19
 
 typedef struct author_
 {
     int id;
-    char last_name[auth_lname_max_len];
-    char first_name[auth_fname_max_len];
-    char birth_date[auth_bdate_max_len];
+    char last_name[auth_lname_max_len + 1];
+    char first_name[auth_fname_max_len + 1];
+    char birth_date[auth_bdate_max_len + 1];
 } author_t;
 
 typedef struct subject_
 {
     int id;
-    char name[subj_name_max_len];
+    char name[subj_name_max_len + 1];
 } subject_t;
 
 typedef struct book_
@@ -44,15 +44,15 @@ typedef struct book_
     int stock_quantity;
     float price;
     int publish_year;
-    char title[book_title_max_len];
-    char isbn[book_isbn_max_len];
+    char title[book_title_max_len + 1];
+    char isbn[book_isbn_max_len + 1];
 } book_t;
 
 typedef struct employee_
 {
     int id;
-    char login[employee_login_max_len];
-    char pswd[employee_password_max_len];
+    char login[employee_login_max_len + 1];
+    char pswd[employee_password_max_len + 1];
 } employee_t;
 
 #endif
