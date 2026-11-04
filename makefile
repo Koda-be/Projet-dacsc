@@ -7,7 +7,7 @@ RELEASE=$(BIN)/release
 CCOMP=gcc
 HEADERS=./headers
 WFLAGS=-pedantic-errors -Werror -Wall -Wextra -Wconversion -Wsign-conversion
-FLAGS=-I$(HEADERS) $(WFLAGS)
+FLAGS=-I$(HEADERS) $(WFLAGS) -pthread
 DEBUGFLAGS=-ggdb
 RELEASEFLAGS=-O2 -D NDEBUG
 
@@ -51,7 +51,13 @@ $(OBJS)/test_%.o:	MODNAME =$(patsubst $(OBJS)/test_%.o,%,$@)
 $(OBJS)/test_%.o:	$$(MODNAME)/test.c $(HEADERS)/$$(MODNAME).h
 					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
 
+# Special object files that depend on more than just the module
 
+$(OBJS)/debug_obep.o:	obep/obep.c $(HEADERS)/obep.h $(HEADERS)/entities.h
+					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
+
+$(OBJS)/test_obep.o:	obep/test.c $(HEADERS)/obep.h $(HEADERS)/entities.h
+					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
 
 # Module testing targets
 
