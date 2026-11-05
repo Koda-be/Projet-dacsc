@@ -7,12 +7,12 @@ RELEASE=$(BIN)/release
 CCOMP=gcc
 HEADERS=./headers
 WFLAGS=-pedantic-errors -Werror -Wall -Wextra -Wconversion -Wsign-conversion
-FLAGS=-I$(HEADERS) $(WFLAGS)
+FLAGS=-I$(HEADERS) $(WFLAGS) -pthread
 DEBUGFLAGS=-ggdb
 RELEASEFLAGS=-O2 -D NDEBUG
 
 #Module languages specifications
-CMODULE_NAMES :=sockets
+CMODULE_NAMES :=sockets obep
 CMODULES := $(patsubst %,$(RELEASE)/%,$(CMODULE_NAMES))
 
 #Test
@@ -51,12 +51,21 @@ $(OBJS)/test_%.o:	MODNAME =$(patsubst $(OBJS)/test_%.o,%,$@)
 $(OBJS)/test_%.o:	$$(MODNAME)/test.c $(HEADERS)/$$(MODNAME).h
 					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
 
+# Special object files that depend on more than just the module
 
+$(OBJS)/debug_obep.o:	obep/obep.c $(HEADERS)/obep.h $(HEADERS)/entities.h
+					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
+
+$(OBJS)/test_obep.o:	obep/test.c $(HEADERS)/obep.h $(HEADERS)/entities.h
+					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
 
 # Module testing targets
 
 $(DEBUG)/sockets.test:	$(OBJS)/debug_sockets.o $(OBJS)/test_sockets.o
 			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $(DEBUG)/sockets.test
+
+$(DEBUG)/obep.test:		$(OBJS)/debug_obep.o $(OBJS)/test_obep.o
+			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $(DEBUG)/obep.test
 
 
 #phony targets
