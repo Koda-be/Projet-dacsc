@@ -120,7 +120,7 @@ obep_msg_t* obep_get_msg(const obep_rqst_t* rqst)
         argsize = strlen(arg);
         msg->msg = malloc(argsize+1);
 
-        strncpy(msg->msg, arg, argsize);
+        strncpy(msg->msg, arg, argsize+1);
         free(arg);
     }
     
