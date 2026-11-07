@@ -13,27 +13,35 @@ RELEASEFLAGS=-O2 -D NDEBUG
 
 #Module languages specifications
 CMODULE_NAMES :=sockets obep
-CMODULES := $(patsubst %,$(RELEASE)/%,$(CMODULE_NAMES))
-
+CSERVER := $(RELEASE)/server
+DEBUGCSERVER := $(DEBUG)/server
 #Test
 CTESTS :=$(patsubst %,$(DEBUG)/%.test,$(CMODULE_NAMES))
 TESTS :=$(CTESTS)
 
-#Main and generic targets
-DACSC:	cserver cclient
+#Main targets
+DACSC:	cserver cclient tests
 
 
-cserver:	tests
+cserver:	$(CSERVER)/server
 
 
 cclient:
 
+# Main target object files
 
-$(CMODULES):	$(OBJS)/$@.o
-		$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $@.out
+$(CSERVER)/server:	$(OBJS)/server.o $(OBJS)/socket.o $(OBJS)/obep.o
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -o $@
 
+# Module release object files
 
-tests:	$(TESTS)
+$(OBJS)/sockets.o:	sockets/sockets.c $(HEADERS)/sockets.h
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
+
+$(OBJS)/obep.o:	obep/obep.c $(HEADERS)/obep.h $(HEADERS)/entities
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
+
+tests:	$(TESTS) $(DEBUGCSERVER)/server.test
 
 
 # Target for the object file of the module in debug mode
@@ -59,6 +67,9 @@ $(OBJS)/debug_obep.o:	obep/obep.c $(HEADERS)/obep.h $(HEADERS)/entities.h
 $(OBJS)/test_obep.o:	obep/test.c $(HEADERS)/obep.h $(HEADERS)/entities.h
 					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
 
+$(OBJS)/debug_server.o:	server/server.c $(HEADERS)/entities.h $(HEADERS)/sockets.h $(HEADERS)/obep.h
+					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
+
 # Module testing targets
 
 $(DEBUG)/sockets.test:	$(OBJS)/debug_sockets.o $(OBJS)/test_sockets.o
@@ -67,6 +78,8 @@ $(DEBUG)/sockets.test:	$(OBJS)/debug_sockets.o $(OBJS)/test_sockets.o
 $(DEBUG)/obep.test:		$(OBJS)/debug_obep.o $(OBJS)/test_obep.o
 			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $(DEBUG)/obep.test
 
+$(DEBUGCSERVER)/server.test:	$(OBJS)/debug_server.o $(OBJS)/debug_obep.o $(OBJS)/debug_sockets.o
+			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $@
 
 #phony targets
 .PHONY:	clean clobber newmod
