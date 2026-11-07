@@ -25,11 +25,11 @@ DEBUGCSERVER := $(DEBUG)/server
 CTESTS :=$(patsubst %,$(DEBUG)/%.test,$(CMODULE_NAMES))
 TESTS :=$(CTESTS)
 
-#Main and generic targets
-DACSC:	$(RELEASE)/$(CSERVER) $(RELEASE)/$(CCLIENT) tests
+#Main targets
+DACSC:	cserver cclient tests
 
 
-$(RELEASE)/$(CSERVER):	
+cserver:	$(CSERVER)/server
 
 # Probably very stupid to call cmake inside a make target but oh well
 $(RELEASE)/$(CCLIENT):	$(CCLIENT)/* $(OBJS)/sockets.o
