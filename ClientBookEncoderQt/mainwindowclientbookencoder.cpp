@@ -93,18 +93,6 @@ MainWindowClientBookEncoder::MainWindowClientBookEncoder(QWidget *parent)
         ui->tableWidgetEncodedBooks->setColumnWidth(col, columnWidths[col]);
 
     this->logoutOk();
-
-
-    // Exemples d'utilisation (à supprimer)
-    this->addTupleTableBooks(1,"Les Thanatonautes","Bernard Werber","Science-Fiction","978-2253139225",505,1999,9.7f,3);
-    this->addTupleTableBooks(6,"Dune","Frank Herbert","Science-Fiction","978-2266320481",929,2021,11.95f,13);
-    this->addTupleTableBooks(13,"Le silence des agneaux","Thomas Harris","Thriller","978-2266208949",377,2015,7.7f,17);
-
-    this->addComboBoxAuthors("Bernard Werber");
-    this->addComboBoxAuthors("Dan Brown");
-
-    this->addComboBoxSubjects("Roman");
-    this->addComboBoxSubjects("Science-fiction");
 }
 
 MainWindowClientBookEncoder::~MainWindowClientBookEncoder()
@@ -380,6 +368,18 @@ void MainWindowClientBookEncoder::on_pushButtonAddBook_clicked()
 
     if (envoyerAjoutObep(socketServeur, obep_add_book, &livre, "ADDBOOK"))
     {
+        this->addTupleTableBooks(
+            -1,
+            this->getTitle(),
+            this->getSelectionAuthor(),
+            this->getSelectionSubject(),
+            this->getIsbn(),
+            this->getPageCount(),
+            this->getPublishYear(),
+            this->getPrice(),
+            this->getStockQuantity()
+        );
+
         this->dialogMessage("Livre", "Livre ajoute avec succes !");
         this->on_pushButtonClear_clicked();
     }
