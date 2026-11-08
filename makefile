@@ -8,7 +8,8 @@ CMAKEBUILD=/tmp/cmakebuild
 CCOMP=gcc
 HEADERS=./headers
 WFLAGS=-pedantic-errors -Werror -Wall -Wextra -Wconversion -Wsign-conversion
-FLAGS=-I$(HEADERS) $(WFLAGS) -pthread
+FLAGS=-I$(HEADERS) $(WFLAGS) $(MYSQLFLAGS) -pthread
+MYSQLFLAGS=-I/usr/include/mysql -I/usr/include/mysql/mysql -L/usr/lib/ -lmariadb
 DEBUGFLAGS=-ggdb
 RELEASEFLAGS=-O2 -D NDEBUG
 
@@ -18,8 +19,8 @@ CCLIENT=ClientBookEncoderQt
 
 #Module languages specifications
 CMODULE_NAMES :=sockets obep
-CMODULES := $(patsubst %,$(RELEASE)/%,$(CMODULE_NAMES))
-
+CSERVER := $(RELEASE)/server
+DEBUGCSERVER := $(DEBUG)/server
 #Test
 CTESTS :=$(patsubst %,$(DEBUG)/%.test,$(CMODULE_NAMES))
 TESTS :=$(CTESTS)
@@ -36,12 +37,23 @@ $(RELEASE)/$(CCLIENT):	$(CCLIENT)/* $(OBJS)/sockets.o
 			cmake --build $(CMAKEBUILD)/$(CCLIENT)
 			mv $(CMAKEBUILD)/$(CCLIENT)/$(CCLIENT) $(RELEASE)
 
+$(CSERVER)/server:	$(OBJS)/server.o $(OBJS)/sockets.o $(OBJS)/obep.o
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) $^ -o $@
 
-$(CMODULES):	$(OBJS)/$@.o
-		$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $@.out
+# Main target object files
 
+$(OBJS)/server.o:	server/server.c $(HEADERS)/obep.h $(HEADERS)/sockets.h $(HEADERS)/entities.h
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
 
-tests:	$(TESTS)
+# Module release object files
+
+$(OBJS)/sockets.o:	sockets/sockets.c $(HEADERS)/sockets.h
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
+
+$(OBJS)/obep.o:	obep/obep.c $(HEADERS)/obep.h $(HEADERS)/entities.h
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
+
+tests:	$(TESTS) $(DEBUGCSERVER)/server.test
 
 
 # Target for the object file of the module in release mode
@@ -75,6 +87,9 @@ $(OBJS)/debug_obep.o:	obep/obep.c $(HEADERS)/obep.h $(HEADERS)/entities.h
 $(OBJS)/test_obep.o:	obep/test.c $(HEADERS)/obep.h $(HEADERS)/entities.h
 					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
 
+$(OBJS)/debug_server.o:	server/server.c $(HEADERS)/entities.h $(HEADERS)/sockets.h $(HEADERS)/obep.h
+					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
+
 # Module testing targets
 
 $(DEBUG)/sockets.test:	$(OBJS)/debug_sockets.o $(OBJS)/test_sockets.o
@@ -83,6 +98,8 @@ $(DEBUG)/sockets.test:	$(OBJS)/debug_sockets.o $(OBJS)/test_sockets.o
 $(DEBUG)/obep.test:		$(OBJS)/debug_obep.o $(OBJS)/test_obep.o
 			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $(DEBUG)/obep.test
 
+$(DEBUGCSERVER)/server.test:	$(OBJS)/debug_server.o $(OBJS)/debug_obep.o $(OBJS)/debug_sockets.o
+			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $@
 
 #phony targets
 .PHONY:	clean clobber newmod
