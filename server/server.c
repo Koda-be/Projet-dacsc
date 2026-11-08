@@ -30,6 +30,7 @@ int add_subj_to_db(const subject_t* subj);
 int add_book_to_db(const book_t* book);
 
 int loggedIn;
+MYSQL* mysqlConnection = NULL;
 
 int main(void)
 {
@@ -43,7 +44,7 @@ int main(void)
 
     trace("port: %d, nbthread: %d", port, nbthread);
 
-    MYSQL* mysqlConnection = mysql_init(NULL);
+    mysqlConnection = mysql_init(NULL);
     if(mysql_real_connect(mysqlConnection, "localhost", "DACSC", "DACSC#CassLioB38@", "DACSC", 0,0,0) == NULL) 
     {
         trace("Error with mysql connection: %s", mysql_error(mysqlConnection));
@@ -231,3 +232,37 @@ obep_rqst_t* processRequest(obep_rqst_t* rqst)
 
 
 // MYSQL 
+
+#define MYSQL_RESERVED_CHAR "\"*;'"
+
+int check_if_usable_str(const char* str);
+
+int check_employee_existence(const employee_t* empl)
+{
+    if(!(check_if_usable_str(empl->login) && check_if_usable_str(empl->pswd))) return 0;
+
+    const char format[] = "SELECT * FROM employees WHERE login=%20s AND password=%20s";
+    char query[50 + employee_login_max_len + employee_password_max_len + 1];
+    
+    sprintf(query, format, empl->login, empl->pswd);
+
+    if(mysql_query(mysqlConnection, query) != 0)
+        return 0;
+
+    MYSQL_RES* result;
+    if((result = mysql_store_result(mysqlConnection)) == NULL || mysql_fetch_row(result) == NULL) return 0;
+
+    return 1;
+}
+
+int check_if_usable_str(const char* str)
+{
+    size_t strlength = strlen(str);
+    int rsrvdlenght = strlen(MYSQL_RESERVED_CHAR);
+
+    for(size_t i = 0; i <= strlength; i++)
+        for(int j = 0; j <= rsrvdlenght; j++)
+            if(str[i] == MYSQL_RESERVED_CHAR[j]) return 0;
+    
+    return 1;
+}
