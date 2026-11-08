@@ -21,12 +21,16 @@ int cslib_serverSocket(const int port)
         return -1;
     } 
 
-    struct addrinfo *results;
+    struct addrinfo *results = NULL;
 
 
-    if(cslib_getaddrinfo(NULL, port, AI_PASSIVE,&results) != 0)
+    if(cslib_getaddrinfo(NULL, port, AI_PASSIVE, &results) != 0)
     {
         close(s);
+
+        if (results != NULL)
+            freeaddrinfo(results);
+
         errno = CSLIB_EADDRESS_INFO_OBTENTION;
         return -1;
     }
@@ -73,10 +77,13 @@ int cslib_clientSocket(const char* ip, const int port)
         return -1;
     }
 
-    struct addrinfo* results;
+    struct addrinfo* results = NULL;
 
     if (cslib_getaddrinfo(ip, port, 0, &results) != 0)
     {
+        if (results != NULL)
+            freeaddrinfo(results);
+
         close(s);
         errno = CSLIB_EADDRESS_INFO_OBTENTION;
         return -1;
@@ -88,12 +95,11 @@ int cslib_clientSocket(const char* ip, const int port)
 
     if (status == -1)
     {
-        freeaddrinfo(results);
         close(s);
         errno = CSLIB_ECONNECT_TO_SERVER;
         return -1;
     }
-    freeaddrinfo(results);
+
     return s;
 }
 
