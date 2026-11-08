@@ -7,7 +7,8 @@ RELEASE=$(BIN)/release
 CCOMP=gcc
 HEADERS=./headers
 WFLAGS=-pedantic-errors -Werror -Wall -Wextra -Wconversion -Wsign-conversion
-FLAGS=-I$(HEADERS) $(WFLAGS) -pthread
+FLAGS=-I$(HEADERS) $(WFLAGS) $(MYSQLFLAGS) -pthread
+MYSQLFLAGS=-I/usr/include/mysql -I/usr/include/mysql/mysql -L/usr/lib/ -lmariadb
 DEBUGFLAGS=-ggdb
 RELEASEFLAGS=-O2 -D NDEBUG
 
@@ -28,17 +29,20 @@ cserver:	$(CSERVER)/server
 
 cclient:
 
+$(CSERVER)/server:	$(OBJS)/server.o $(OBJS)/sockets.o $(OBJS)/obep.o
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) $^ -o $@
+
 # Main target object files
 
-$(CSERVER)/server:	$(OBJS)/server.o $(OBJS)/socket.o $(OBJS)/obep.o
-			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -o $@
+$(OBJS)/server.o:	server/server.c $(HEADERS)/obep.h $(HEADERS)/sockets.h $(HEADERS)/entities.h
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
 
 # Module release object files
 
 $(OBJS)/sockets.o:	sockets/sockets.c $(HEADERS)/sockets.h
 			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
 
-$(OBJS)/obep.o:	obep/obep.c $(HEADERS)/obep.h $(HEADERS)/entities
+$(OBJS)/obep.o:	obep/obep.c $(HEADERS)/obep.h $(HEADERS)/entities.h
 			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
 
 tests:	$(TESTS) $(DEBUGCSERVER)/server.test
