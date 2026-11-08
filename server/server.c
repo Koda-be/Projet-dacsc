@@ -5,12 +5,53 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include "entities.h"
 #include "sockets.h"
 #include "obep.h"
 
 #define CONFIG_FILE ".server.cfg"
 #define PORT_ENCODING "PORT_ENCODING"
 #define NTHREAD "NTHREAD"
+
+#define trace(format, ...) printf("[%d] > " format, getpid() __VA_OPT__(,) __VA_ARGS__);
+
+int configure(char* filepath, int* port, int* nbthread);
+void* connectionHandler(void* arg);
+obep_rqst_t* processRequest(obep_rqst_t* rqst);
+
+int check_employee_existence(const employee_t* empl);
+
+author_t* get_auth_from_db(void);
+subject_t* get_subj_from_db(void);
+
+int add_auth_to_db(const author_t* auth);
+int add_subj_to_db(const subject_t* subj);
+int add_book_to_db(const book_t* book);
+
+
+int main(void)
+{
+    int port = 0, nbthread = 0;
+
+    if(configure(CONFIG_FILE, &port, &nbthread) == -1) 
+    {
+        perror("Couldn't configure through config file");
+        exit(0);
+    }
+
+    trace("port: %d, nbthread: %d", port, nbthread);
+
+    int lstnscket = cslib_serverSocket(port);
+
+    while(1)
+    {
+        int srvcscket = cslib_accept(lstnscket);
+
+        connectionHandler(&srvcscket);
+    }
+
+    return 0;
+}
 
 int configure(char* filepath, int* port, int* nbthread)
 {
@@ -56,17 +97,31 @@ inval_value:
     return -1;
 }
 
-int main(void)
+void* connectionHandler(void* arg)
 {
-    int port = 0, nbthread = 0;
+    int socket = *(int*) arg;
 
-    if(configure(CONFIG_FILE, &port, &nbthread) == -1) 
-    {
-        perror("Couldn't configure through config file");
-        exit(0);
-    }
+    obep_msg_t msg;
 
-    printf("port: %d, nbthread: %d", port, nbthread);
+    cslib_receive(socket, msg.header, OBEP__HEADER_LENGTH);
 
-    return 0;
+    msg.msg = malloc(obep_get_msg_size(&msg));
+
+    obep_rqst_t* rqst = obep_get_rqst(&msg);
+    free(msg.msg);
+
+    obep_rqst_t* rslt = processRequest(rqst);
+
+    free(rqst->arg); free(rqst);
+
+    obep_msg_t* response = obep_get_msg(rslt);
+
+    free(rslt->arg); free(rslt);
+
+    cslib_send(socket, response->header, OBEP__HEADER_LENGTH);
+    cslib_send(socket, response->msg, obep_get_msg_size(response));
+
+    free(response->msg); free(response);
+
+    return NULL;
 }
