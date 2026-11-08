@@ -5,20 +5,77 @@
 #include <QMessageBox>
 #include <iostream>
 #include <QLineEdit>
+#include <QByteArray>
+#include <cstring>
+#include <cstdlib>
+#include <QStringList>
 
 extern "C" {
     #include "sockets.h"
+    #include "entities.h"
+    #include "obep.h"
+    #include "obep_transport.h"
 }
 
 using namespace std;
+
+static bool copierChamp(char* destination, size_t capacite, const string& valeur)
+{
+    if (valeur.empty() || valeur.size() >= capacite)
+        return false;
+
+    std::memcpy(destination, valeur.data(), valeur.size());
+    return true;
+}
+
+static bool envoyerAjoutObep(
+    int socket,
+    obep_rqst_type_t type,
+    void* donnees,
+    const char* commande)
+{
+    obep_rqst_t requete{};
+    requete.rqst_type = type;
+    requete.msg_type = obep_req;
+    requete.rqst_rslt = obep_norslt;
+    requete.argc = 1;
+    requete.arg = donnees;
+
+    obep_msg_t* message = obep_get_msg(&requete);
+
+    if (message == nullptr)
+        return false;
+
+    bool envoye = obep_send_frame(socket, message) == 0;
+
+    std::free(message->msg);
+    std::free(message);
+
+    if (!envoye)
+        return false;
+
+    obep_msg_t reponse{};
+
+    if (obep_receive_frame(socket, &reponse) != 0)
+    {
+        std::free(reponse.msg);
+        return false;
+    }
+
+    bool succes =
+        std::memcmp(reponse.header, "0000|", 5) == 0 &&
+        std::memcmp(reponse.header + 5, commande, 7) == 0 &&
+        std::memcmp(reponse.header + 12, "|AN|SUCCESS#", 12) == 0;
+
+    std::free(reponse.msg);
+    return succes;
+}
 
 MainWindowClientBookEncoder::MainWindowClientBookEncoder(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindowClientBookEncoder)
 {
     ui->setupUi(this);
-    ::close(2);
-
     //this->setFixedSize(1068, 301);
 
     // Configuration de la table des employes (Personnel Garage)
@@ -243,30 +300,93 @@ int MainWindowClientBookEncoder::dialogInputInt(const string& title,const string
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///// Fonctions gestion des boutons et items de menu (TO DO) /////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void MainWindowClientBookEncoder::on_pushButtonAddAuthor_clicked() {
-    string lastName = this->dialogInputText("Nouvel auteur","Nom ?");
-    string firstName = this->dialogInputText("Nouvel auteur","Prénom ?");
-    string birthDate = this->dialogInputText("Nouvel auteur","Date de naissance (yyyy-mm-dd) ?");
-    cout << "Nom : " << lastName << endl;
-    cout << "Prénom : " << firstName << endl;
-    cout << "Date de naissance : " << birthDate << endl;
+void MainWindowClientBookEncoder::on_pushButtonAddAuthor_clicked()
+{
+    author_t auteur{};
+
+    string nom = this->dialogInputText("Nouvel auteur", "Nom ?");
+    string prenom = this->dialogInputText("Nouvel auteur", "Prenom ?");
+    string naissance = this->dialogInputText(
+        "Nouvel auteur", "Date de naissance (yyyy-mm-dd) ?"
+    );
+
+    if (!copierChamp(auteur.last_name, sizeof(auteur.last_name), nom) ||
+        !copierChamp(auteur.first_name, sizeof(auteur.first_name), prenom) ||
+        !copierChamp(auteur.birth_date, sizeof(auteur.birth_date), naissance))
+    {
+        this->dialogError("Auteur", "Champs vides ou trop longs.");
+        return;
+    }
+
+    if (envoyerAjoutObep(socketServeur, obep_add_auth, &auteur, "ADDAUTH"))
+    {
+        this->dialogMessage("Auteur", "Auteur ajoute avec succes !");
+        this->chargerListes();
+    }
+    else
+    {
+        this->dialogError("Auteur", "Ajout refuse ou erreur de communication.");
+    }
 }
 
-void MainWindowClientBookEncoder::on_pushButtonAddSubject_clicked() {
-    string name = this->dialogInputText("Nouveau sujet","Nom ?");
-    cout << "Nom : " << name << endl;
+void MainWindowClientBookEncoder::on_pushButtonAddSubject_clicked()
+{
+    subject_t sujet{};
+
+    string nom = this->dialogInputText("Nouveau sujet", "Nom ?");
+
+    if (!copierChamp(sujet.name, sizeof(sujet.name), nom))
+    {
+        this->dialogError("Sujet", "Nom vide ou trop long.");
+        return;
+    }
+
+    if (envoyerAjoutObep(socketServeur, obep_add_subj, &sujet, "ADDSUBJ"))
+    {
+        this->dialogMessage("Sujet", "Sujet ajoute avec succes !");
+        this->chargerListes();
+    }
+    else
+    {
+        this->dialogError("Sujet", "Ajout refuse ou erreur de communication.");
+    }
 }
 
-void MainWindowClientBookEncoder::on_pushButtonAddBook_clicked() {
-    cout << "title = " << this->getTitle() << endl;
-    cout << "Isbn = " << this->getIsbn() << endl;
-    cout << "PageCount = " << this->getPageCount() << endl;
-    cout << "Price = " << this->getPrice() << endl;
-    cout << "PublishYear = " << this->getPublishYear() << endl;
-    cout << "Stock = " << this->getStockQuantity() << endl;
+void MainWindowClientBookEncoder::on_pushButtonAddBook_clicked()
+{
+    book_t livre{};
 
-    cout << "selection auteur = " << this->getSelectionAuthor() << endl;
-    cout << "selection sujet  = " << this->getSelectionSubject() << endl;
+    livre.processed = 0;
+    livre.auth.auth_id = ui->comboBoxAuthors->currentData().toInt();
+    livre.subj.subj_id = ui->comboBoxSubjects->currentData().toInt();
+
+    livre.page_count = this->getPageCount();
+    livre.stock_quantity = this->getStockQuantity();
+    livre.price = this->getPrice();
+    livre.publish_year = this->getPublishYear();
+
+    if (livre.auth.auth_id <= 0 || livre.subj.subj_id <= 0)
+    {
+        this->dialogError("Livre", "Selectionne un auteur et un sujet.");
+        return;
+    }
+
+    if (!copierChamp(livre.title, sizeof(livre.title), this->getTitle()) ||
+        !copierChamp(livre.isbn, sizeof(livre.isbn), this->getIsbn()))
+    {
+        this->dialogError("Livre", "Titre ou ISBN vide ou trop long.");
+        return;
+    }
+
+    if (envoyerAjoutObep(socketServeur, obep_add_book, &livre, "ADDBOOK"))
+    {
+        this->dialogMessage("Livre", "Livre ajoute avec succes !");
+        this->on_pushButtonClear_clicked();
+    }
+    else
+    {
+        this->dialogError("Livre", "Ajout refuse ou erreur de communication.");
+    }
 }
 
 void MainWindowClientBookEncoder::on_pushButtonClear_clicked() {
@@ -312,9 +432,32 @@ void MainWindowClientBookEncoder::on_actionLogin_triggered()
     if (!confirme || password.isEmpty())
         return;
 
-    // Les identifiants seront utilisés lors de l'envoi OBEP.
-    Q_UNUSED(login);
-    Q_UNUSED(password);
+
+        // Conversion des QString de Qt en chaînes UTF-8
+    QByteArray loginBytes = login.toUtf8();
+    QByteArray passwordBytes = password.toUtf8();
+
+    // Création de l'employé attendu par OBEP
+    employee_t employe = {0};
+
+    // Vérification des tailles avant la copie
+    if (loginBytes.size() >= static_cast<qsizetype>(sizeof(employe.login)) ||
+        passwordBytes.size() >= static_cast<qsizetype>(sizeof(employe.pswd)))
+    {
+        this->dialogError("Login", "Identifiant ou mot de passe trop long.");
+        return;
+    }
+
+    // Copie des identifiants dans la structure
+    std::memcpy(employe.login, loginBytes.constData(), loginBytes.size());
+    std::memcpy(employe.pswd, passwordBytes.constData(), passwordBytes.size());
+
+    // Construction de la requête OBEP
+    obep_rqst_t requete{};
+    requete.rqst_type = obep_login;
+    requete.msg_type = obep_req;
+    requete.rqst_rslt = obep_norslt;
+    requete.arg = &employe;
 
     socketServeur = cslib_clientSocket("127.0.0.1", 45678);
 
@@ -336,14 +479,306 @@ void MainWindowClientBookEncoder::on_actionLogin_triggered()
         return;
     }
 
-    this->dialogMessage("Connexion",
-                        "Connexion TCP etablie. Authentification OBEP non effectuee.");
+    // Transformer la requête LOGIN en message OBEP
+    obep_msg_t* message = obep_get_msg(&requete);
+
+    // Vérifier que la sérialisation a fonctionné
+    if (message == nullptr || message->msg == nullptr)
+    {
+        this->dialogError("LOGIN", "Erreur de serialisation OBEP.");
+
+        if (message != nullptr)
+        {
+            std::free(message->msg);
+            std::free(message);
+        }
+
+        ::close(socketServeur);
+        socketServeur = -1;
+        return;
+    }
+
+    // Envoyer le message OBEP sur la connexion TCP
+    int resultatEnvoi = obep_send_frame(socketServeur, message);
+
+    // Le message sérialisé n'est plus nécessaire après l'envoi
+    std::free(message->msg);
+    std::free(message);
+
+    // Vérifier le résultat de l'envoi
+    if (resultatEnvoi == -1)
+    {
+        this->dialogError("LOGIN", "Erreur lors de l'envoi OBEP.");
+
+        ::close(socketServeur);
+        socketServeur = -1;
+        return;
+    }
+
+    // Recevoir la réponse OBEP envoyée par le serveur
+    obep_msg_t reponse{};
+
+    if (obep_receive_frame(socketServeur, &reponse) == -1)
+    {
+        std::free(reponse.msg);
+
+        ::close(socketServeur);
+        socketServeur = -1;
+
+        this->dialogError("LOGIN",
+                        "Erreur reseau : reponse OBEP non recue.");
+        return;
+    }
+
+    // Vérifier les deux réponses possibles de notre serveur simulé
+    bool succes = std::memcmp(
+        reponse.header,
+        "0000|LOGIN  |AN|SUCCESS#",
+        OBEP__HEADER_LENGTH
+    ) == 0;
+
+    bool refus = std::memcmp(
+        reponse.header,
+        "0000|LOGIN  |AN|FAILURE#",
+        OBEP__HEADER_LENGTH
+    ) == 0;
+
+    // Libérer le contenu éventuellement alloué à la réception
+    std::free(reponse.msg);
+
+    // Traiter le résultat de l'authentification
+    if (succes)
+    {
+        this->loginOk();
+
+        if (this->chargerListes())
+        {
+            this->dialogMessage(
+                "Login",
+                "Authentification acceptee !"
+            );
+        }
+    }
+
+    // En cas de refus ou de réponse incorrecte,
+    // la connexion n'est pas conservée.
+    ::close(socketServeur);
+    socketServeur = -1;
+
+    if (refus)
+    {
+        this->dialogError("LOGIN",
+                        "Identifiants refuses par le serveur.");
+    }
+    else
+    {
+        this->dialogError("LOGIN",
+                        "Reponse OBEP inattendue ou incorrecte.");
+    }
 }
 
-void MainWindowClientBookEncoder::on_actionLogout_triggered() {
+void MainWindowClientBookEncoder::on_actionLogout_triggered()
+{
+    if (socketServeur >= 0)
+    {
+        obep_rqst_t requete{};
+        requete.rqst_type = obep_logout;
+        requete.msg_type = obep_req;
+        requete.rqst_rslt = obep_norslt;
+
+        obep_msg_t* message = obep_get_msg(&requete);
+
+        if (message != nullptr)
+        {
+            if (obep_send_frame(socketServeur, message) == 0)
+            {
+                obep_msg_t reponse{};
+
+                if (obep_receive_frame(socketServeur, &reponse) == 0)
+                {
+                    if (std::memcmp(
+                            reponse.header,
+                            "0000|LOGOUT |AN|SUCCESS#",
+                            OBEP__HEADER_LENGTH) != 0)
+                    {
+                        this->dialogError(
+                            "Logout",
+                            "Reponse LOGOUT inattendue ou refusee."
+                        );
+                    }
+                }
+                else
+                {
+                    this->dialogError(
+                        "Logout",
+                        "Aucune reponse OBEP recue."
+                    );
+                }
+
+                std::free(reponse.msg);
+            }
+            else
+            {
+                this->dialogError(
+                    "Logout",
+                    "Impossible d'envoyer la requete LOGOUT."
+                );
+            }
+
+            std::free(message->msg);
+            std::free(message);
+        }
+
+        ::close(socketServeur);
+        socketServeur = -1;
+    }
+
     this->logoutOk();
 }
 
 void MainWindowClientBookEncoder::on_actionQuitter_triggered(){
+
     QApplication::exit(0);
+}
+
+
+bool MainWindowClientBookEncoder::chargerListes()
+{
+    this->clearComboBoxAuthors();
+    this->clearComboBoxSubjects();
+
+    const obep_rqst_type_t types[] = {
+        obep_get_auth,
+        obep_get_subj
+    };
+
+    const char* commandes[] = {
+        "GETAUTH",
+        "GETSUBJ"
+    };
+
+    for (int i = 0; i < 2; ++i)
+    {
+        // Préparer la requête OBEP
+        obep_rqst_t requete{};
+        requete.rqst_type = types[i];
+        requete.msg_type = obep_req;
+        requete.rqst_rslt = obep_norslt;
+
+        obep_msg_t* message = obep_get_msg(&requete);
+
+        if (message == nullptr)
+            break;
+
+        // Envoyer la requête
+        bool ok = obep_send_frame(socketServeur, message) == 0;
+
+        std::free(message->msg);
+        std::free(message);
+
+        if (!ok)
+            break;
+
+        // Recevoir la réponse
+        obep_msg_t reponse{};
+
+        if (obep_receive_frame(socketServeur, &reponse) != 0)
+        {
+            std::free(reponse.msg);
+            break;
+        }
+
+        // Vérifier que la réponse correspond à la requête
+        ok =
+            std::memcmp(reponse.header + 5, commandes[i], 7) == 0 &&
+            std::memcmp(reponse.header + 13, "AN", 2) == 0 &&
+            std::memcmp(reponse.header + 16, "SUCCESS", 7) == 0;
+
+        if (!ok)
+        {
+            std::free(reponse.msg);
+            break;
+        }
+
+        // Une liste vide est possible
+        if (reponse.msg != nullptr && reponse.msg[0] != '\0')
+        {
+            // Désérialisation par le module de Lionel
+            obep_rqst_t* resultat = obep_get_rqst(&reponse);
+
+            std::free(reponse.msg);
+
+            if (resultat == nullptr)
+                break;
+
+            ok =
+                resultat->rqst_type == types[i] &&
+                resultat->msg_type == obep_ans &&
+                resultat->rqst_rslt == obep_success &&
+                resultat->argc >= 0 &&
+                (resultat->argc == 0 || resultat->arg != nullptr);
+
+            if (ok && i == 0)
+            {
+                // Liste des auteurs
+                author_t* auteurs =
+                    static_cast<author_t*>(resultat->arg);
+
+                for (int j = 0; j < resultat->argc; ++j)
+                {
+                    QString nom =
+                        QString::fromUtf8(auteurs[j].first_name) +
+                        " " +
+                        QString::fromUtf8(auteurs[j].last_name);
+
+                    ui->comboBoxAuthors->addItem(nom, auteurs[j].id);
+                }
+            }
+            else if (ok && i == 1)
+            {
+                // Liste des sujets
+                subject_t* sujets =
+                    static_cast<subject_t*>(resultat->arg);
+
+                for (int j = 0; j < resultat->argc; ++j)
+                {
+                    ui->comboBoxSubjects->addItem(
+                        QString::fromUtf8(sujets[j].name),
+                        sujets[j].id
+                    );
+                }
+            }
+
+            std::free(resultat->arg);
+            std::free(resultat);
+
+            if (!ok)
+                break;
+        }
+        else
+        {
+            std::free(reponse.msg);
+        }
+        if (i == 1)
+            return true;
+    }
+
+        // Une des deux requêtes a échoué
+    this->clearComboBoxAuthors();
+    this->clearComboBoxSubjects();
+
+    if (socketServeur >= 0)
+    {
+        ::close(socketServeur);
+        socketServeur = -1;
+    }
+
+    this->logoutOk();
+
+    this->dialogError(
+        "OBEP",
+        "Impossible de recuperer les auteurs ou les sujets."
+    );
+
+    return false;
 }

@@ -50,6 +50,7 @@ private slots:
     void on_actionLogin_triggered();
     void on_actionLogout_triggered();
     void on_actionQuitter_triggered();
+    bool chargerListes();
 
 private:
     Ui::MainWindowClientBookEncoder *ui;
