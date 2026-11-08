@@ -558,6 +558,7 @@ void MainWindowClientBookEncoder::on_actionLogin_triggered()
                 "Authentification acceptee !"
             );
         }
+        return;
     }
 
     // En cas de refus ou de réponse incorrecte,
