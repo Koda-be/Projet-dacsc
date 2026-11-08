@@ -17,6 +17,9 @@
 #define trace(format, ...) printf("[%d] > " format "\n", getpid() __VA_OPT__(,) __VA_ARGS__);
 
 int configure(char* filepath, int* port, int* nbthread);
+
+int* get_ID(void);
+
 void* connectionHandler(void* arg);
 obep_rqst_t* processRequest(obep_rqst_t* rqst);
 
@@ -29,12 +32,27 @@ int add_auth_to_db(const author_t* auth);
 int add_subj_to_db(const subject_t* subj);
 int add_book_to_db(const book_t* book);
 
-int loggedIn;
+pthread_key_t   key_ID,
+                key_loggedIn;
+
+pthread_mutex_t mysqlMutex = PTHREAD_MUTEX_INITIALIZER,
+                getIdMutex = PTHREAD_MUTEX_INITIALIZER;
+
+int  nbthread = 0;
+pthread_t threads;
+
 MYSQL* mysqlConnection = NULL;
 
 int main(void)
 {
-    int port = 0, nbthread = 0;
+    pthread_key_create(&key_ID, free);
+    pthread_key_create(&key_loggedIn, free);
+
+    pthread_setspecific(key_ID, (void*) get_ID());
+
+
+
+    int port = 0;
 
     if(configure(CONFIG_FILE, &port, &nbthread) == -1) 
     {
@@ -59,7 +77,6 @@ int main(void)
     while(1)
     {
         trace("listening on socket %d...", lstnscket);
-        loggedIn = 0;
         int srvcscket = cslib_accept(lstnscket);
 
         trace("Accepted connection with socket %d", srvcscket);
@@ -112,6 +129,23 @@ inval_value:
     free(strfile);
     errno = EINVAL;
     return -1;
+}
+
+int* get_ID(void)
+{
+    static int i = 0;
+    
+    pthread_mutex_lock(&getIdMutex);
+
+    i++;
+
+    int* next_ID = malloc(sizeof(int));
+
+    *next_ID = i;
+
+    pthread_mutex_unlock(&getIdMutex);
+
+    return next_ID;
 }
 
 void* connectionHandler(void* arg)
