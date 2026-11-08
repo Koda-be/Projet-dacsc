@@ -2,6 +2,7 @@ OBJS=objs
 BIN=bin
 DEBUG=$(BIN)/debug
 RELEASE=$(BIN)/release
+CMAKEBUILD=/tmp/cmakebuild
 
 #C compiler
 CCOMP=gcc
@@ -12,6 +13,10 @@ MYSQLFLAGS=-I/usr/include/mysql -I/usr/include/mysql/mysql -L/usr/lib/ -lmariadb
 DEBUGFLAGS=-ggdb
 RELEASEFLAGS=-O2 -D NDEBUG
 
+#Main target names
+CSERVER=cserver
+CCLIENT=ClientBookEncoderQt
+
 #Module languages specifications
 CMODULE_NAMES :=sockets obep
 CSERVER := $(RELEASE)/server
@@ -20,14 +25,17 @@ DEBUGCSERVER := $(DEBUG)/server
 CTESTS :=$(patsubst %,$(DEBUG)/%.test,$(CMODULE_NAMES))
 TESTS :=$(CTESTS)
 
-#Main targets
-DACSC:	cserver cclient tests
+#Main and generic targets
+DACSC:	$(RELEASE)/$(CSERVER) $(RELEASE)/$(CCLIENT) tests
 
 
-cserver:	$(CSERVER)/server
+$(RELEASE)/$(CSERVER):	
 
-
-cclient:
+# Probably very stupid to call cmake inside a make target but oh well
+$(RELEASE)/$(CCLIENT):	$(CCLIENT)/* $(OBJS)/sockets.o
+			cmake -S $(CCLIENT) -B $(CMAKEBUILD)/$(CCLIENT)
+			cmake --build $(CMAKEBUILD)/$(CCLIENT)
+			mv $(CMAKEBUILD)/$(CCLIENT)/$(CCLIENT) $(RELEASE)
 
 $(CSERVER)/server:	$(OBJS)/server.o $(OBJS)/sockets.o $(OBJS)/obep.o
 			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) $^ -o $@
@@ -46,6 +54,14 @@ $(OBJS)/obep.o:	obep/obep.c $(HEADERS)/obep.h $(HEADERS)/entities.h
 			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
 
 tests:	$(TESTS) $(DEBUGCSERVER)/server.test
+
+
+# Target for the object file of the module in release mode
+.SECONDEXPANSION:
+$(OBJS)/%.o:	MODNAME =$(patsubst $(OBJS)/%.o,%,$@)
+
+$(OBJS)/%.o:	$$(MODNAME)/$$(MODNAME).c $(HEADERS)/%.h
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
 
 
 # Target for the object file of the module in debug mode
@@ -90,6 +106,7 @@ $(DEBUGCSERVER)/server.test:	$(OBJS)/debug_server.o $(OBJS)/debug_obep.o $(OBJS)
 
 clean:
 		rm -f $(OBJS)/*.o
+		rm -rf $(CMAKEBUILD)/*
 
 clobber: clean
 		rm -f $(RELEASE)/*
