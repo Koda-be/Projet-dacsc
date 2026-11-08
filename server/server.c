@@ -255,6 +255,70 @@ int check_employee_existence(const employee_t* empl)
     return 1;
 }
 
+int get_auth_from_db(author_t** auth)
+{
+    *auth = NULL;
+    if(mysql_query(mysqlConnection, "SELECT * FROM authors;") != 0) return -1;
+
+    MYSQL_RES* rslt;
+    if((rslt = mysql_store_result(mysqlConnection)) == NULL) return -1;
+
+    size_t rows = mysql_num_rows(rslt);
+
+    *auth = (author_t*) malloc(rows*sizeof(author_t));
+
+    MYSQL_ROW row;
+    for(int i = 0; (row = mysql_fetch_row(rslt)) != NULL; i++)
+    {
+        (*auth)[i].id = atoi(row[0]);
+        strncpy((*auth)[i].last_name, row[1], auth_lname_max_len+1);
+        strncpy((*auth)[i].first_name, row[2], auth_lname_max_len+1);
+        strncpy((*auth)[i].birth_date, row[3], auth_bdate_max_len+1);
+    }
+
+    return (int) rows;
+}
+
+int get_subj_from_db(subject_t** subj)
+{
+
+    *subj = NULL;
+    if(mysql_query(mysqlConnection, "SELECT * FROM subjects;") != 0) return -1;
+
+    MYSQL_RES* rslt;
+    if((rslt = mysql_store_result(mysqlConnection)) == NULL) return -1;
+
+    size_t rows = mysql_num_rows(rslt);
+
+    *subj = (subject_t*) malloc(rows*sizeof(subject_t));
+
+    MYSQL_ROW row;
+    for(int i = 0; (row = mysql_fetch_row(rslt)) != NULL; i++)
+    {
+        (*subj)[i].id = atoi(row[0]);
+        strncpy((*subj)[i].name, row[1], subj_name_max_len+1);
+    }
+
+    return (int) rows;
+}
+
+int add_book_to_db(const book_t* book)
+{
+    if(!(check_if_usable_str(book->isbn) && check_if_usable_str(book->title))) return -1;
+
+    const char* format = "INSERT INTO books (author_id, subject_id, page_count, stock_quantity, price, publish_year, title, isbn) values(%d, %d, %d, %d, %f, %d, %100s, %20s);";
+    char  query[149 + book_title_max_len + book_isbn_max_len + 2 + 11 * 6 + 1];
+
+    sprintf(query,      format, 
+                        (book->processed ? book->auth.auth->id : book->auth.auth_id), 
+                        (book->processed ? book->subj.subj->id : book->subj.subj_id),
+                    book->page_count, book->stock_quantity, book->price, book->publish_year, book->title, book->isbn);
+
+    if(mysql_query(mysqlConnection, query) != 0) return -1;
+
+    return 0;
+}
+
 int check_if_usable_str(const char* str)
 {
     size_t strlength = strlen(str);
