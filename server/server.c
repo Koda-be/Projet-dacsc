@@ -17,6 +17,8 @@
 #define trace(format, ...) printf("[%d::%d] > " format "\n", getpid(), *(int*) pthread_getspecific(key_ID) __VA_OPT__(,) __VA_ARGS__);
 #define loggedIn *(int*) pthread_getspecific(key_loggedIn)
 
+#define UNUSED(x) (void)(x)
+
 typedef struct node_
  {
     int fd;
@@ -27,7 +29,9 @@ int configure(char* filepath, int* port, int* nbthread);
 
 int* get_ID(void);
 
-void* connectionHandler(void* arg);
+void* threadHandler(void* arg);
+
+void connectionHandler(int socket);
 obep_rqst_t* processRequest(obep_rqst_t* rqst);
 
 int check_employee_existence(const employee_t* empl);
@@ -52,7 +56,7 @@ pthread_mutex_t mysqlMutex = PTHREAD_MUTEX_INITIALIZER,
 pthread_cond_t waitlistCond = PTHREAD_COND_INITIALIZER;
 
 int  nbthread = 0;
-pthread_t threads;
+pthread_t* threads;
 
 MYSQL* mysqlConnection = NULL;
 
@@ -75,6 +79,11 @@ int main(void)
     }
 
     trace("port: %d, nbthread: %d", port, nbthread);
+
+    threads = malloc( (size_t) nbthread * sizeof(pthread_t));
+
+    for(int i = 0; i < nbthread; i++)
+        pthread_create(&threads[i], NULL, threadHandler, NULL);
 
     mysqlConnection = mysql_init(NULL);
     if(mysql_real_connect(mysqlConnection, "localhost", "DACSC", "DACSC#CassLioB38@", "DACSC", 0,0,0) == NULL) 
@@ -171,10 +180,30 @@ int* get_ID(void)
     return next_ID;
 }
 
-void* connectionHandler(void* arg)
+void* threadHandler(void* arg)
 {
-    int socket = *(int*) arg;
+    UNUSED(arg); // to supress unused parameter warning
 
+    pthread_setspecific(key_ID, get_ID());
+
+    int socket = -1;
+
+    while(1)
+    {
+        trace("Waiting for connection",);
+        pthread_mutex_lock(&waitlistMutex);
+        while((socket = waitlist_pop()) == -1) pthread_cond_wait(&waitlistCond, &waitlistMutex);
+        pthread_mutex_lock(&waitlistMutex);
+
+        trace("Connected on socket %d", socket);
+
+        connectionHandler(socket);
+    }
+    pthread_exit(NULL);
+}
+
+void connectionHandler(int socket)
+{
     obep_msg_t msg;
 
     while(cslib_receive(socket, msg.header, OBEP__HEADER_LENGTH) != -1)
@@ -205,11 +234,7 @@ void* connectionHandler(void* arg)
 
         free(response->msg); free(response);
     }
-
-    return NULL;
 }
-
-
 
 obep_rqst_t* processRequest(obep_rqst_t* rqst)
 {
@@ -298,8 +323,6 @@ obep_rqst_t* processRequest(obep_rqst_t* rqst)
             }
             break;
     };
-
-
 
     return rslt;
 }
@@ -459,7 +482,7 @@ int check_if_usable_str(const char* str)
     int rsrvdlenght = strlen(MYSQL_RESERVED_CHAR);
 
     for(size_t i = 0; i <= strlength; i++)
-        for(int j = 0; j <= rsrvdlenght; j++)
+        for(int j = 0; j < rsrvdlenght; j++)
             if(str[i] == MYSQL_RESERVED_CHAR[j]) return 0;
     
     return 1;
