@@ -14,7 +14,7 @@
 #define PORT_ENCODING "PORT_ENCODING"
 #define NTHREAD "NTHREAD"
 
-#define trace(format, ...) printf("[%d] > " format, getpid() __VA_OPT__(,) __VA_ARGS__);
+#define trace(format, ...) printf("[%d] > " format "\n", getpid() __VA_OPT__(,) __VA_ARGS__);
 
 int configure(char* filepath, int* port, int* nbthread);
 void* connectionHandler(void* arg);
@@ -52,12 +52,17 @@ int main(void)
         exit(0);
     }
 
+    trace("Successfully connected to DB",);
+
     int lstnscket = cslib_serverSocket(port);
 
     while(1)
     {
+        trace("listening on socket %d...", lstnscket);
         loggedIn = 0;
         int srvcscket = cslib_accept(lstnscket);
+
+        trace("Accepted connection with socket %d", srvcscket);
 
         connectionHandler(&srvcscket);
     }
@@ -116,13 +121,17 @@ void* connectionHandler(void* arg)
     obep_msg_t msg;
 
     while(cslib_receive(socket, msg.header, OBEP__HEADER_LENGTH) != -1)
-    {    
+    {   
+        trace("Received message %24s", msg.header); 
+
         msg.msg = malloc(obep_get_msg_size(&msg));
 
         obep_rqst_t* rqst = obep_get_rqst(&msg);
         free(msg.msg);
 
         obep_rqst_t* rslt = processRequest(rqst);
+
+        if(rslt->rqst_rslt == obep_failure) trace("Rqst failed: mysql error: %s", mysql_error(mysqlConnection));
 
         free(rqst->arg); free(rqst);
 
@@ -180,6 +189,11 @@ obep_rqst_t* processRequest(obep_rqst_t* rqst)
 
         case obep_get_auth:
             rslt->argc = get_auth_from_db((author_t**) &(rslt->arg));
+            if(rslt->argc == -1)
+            {
+                rslt->argc = 0;
+                rslt->rqst_rslt = obep_failure;
+            }
             break;
 
         case obep_get_subj:
@@ -271,9 +285,9 @@ int get_auth_from_db(author_t** auth)
     for(int i = 0; (row = mysql_fetch_row(rslt)) != NULL; i++)
     {
         (*auth)[i].id = atoi(row[0]);
-        strncpy((*auth)[i].last_name, row[1], auth_lname_max_len+1);
-        strncpy((*auth)[i].first_name, row[2], auth_lname_max_len+1);
-        strncpy((*auth)[i].birth_date, row[3], auth_bdate_max_len+1);
+        strncpy((*auth)[i].last_name, row[1], auth_lname_max_len);
+        strncpy((*auth)[i].first_name, row[2], auth_lname_max_len);
+        strncpy((*auth)[i].birth_date, row[3], auth_bdate_max_len);
     }
 
     return (int) rows;
@@ -296,7 +310,7 @@ int get_subj_from_db(subject_t** subj)
     for(int i = 0; (row = mysql_fetch_row(rslt)) != NULL; i++)
     {
         (*subj)[i].id = atoi(row[0]);
-        strncpy((*subj)[i].name, row[1], subj_name_max_len+1);
+        strncpy((*subj)[i].name, row[1], subj_name_max_len);
     }
 
     return (int) rows;
