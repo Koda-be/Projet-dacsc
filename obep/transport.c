@@ -32,12 +32,12 @@ int obep_send_frame(int socket, const obep_msg_t* message)
         return -1;
     }
 
-    if (cslib_sendAll(socket, message->header, OBEP__HEADER_LENGTH) < 0)
+    if (cslib_send(socket, message->header, OBEP__HEADER_LENGTH) < 0)
         return -1;
 
     if (longueur > 0)
     {
-        if (cslib_sendAll(socket, message->msg, (size_t)longueur) < 0)
+        if (cslib_send(socket, message->msg, (size_t)longueur) < 0)
             return -1;
     }
 
@@ -55,7 +55,7 @@ int obep_receive_frame(int socket, obep_msg_t* message)
     obep_msg_t recu = {0};
 
     // 1. Recevoir les 17 octets de l'en-tete
-    ssize_t n = cslib_receiveExact(
+    ssize_t n = cslib_receive(
         socket,
         recu.header,
         OBEP__HEADER_LENGTH
@@ -110,7 +110,7 @@ int obep_receive_frame(int socket, obep_msg_t* message)
     // 6. Recevoir exactement le contenu annonce
     if (longueur > 0)
     {
-        n = cslib_receiveExact(socket, recu.msg, longueur);
+        n = cslib_receive(socket, recu.msg, longueur);
 
         if (n <= 0)
         {

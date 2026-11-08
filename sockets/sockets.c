@@ -171,35 +171,6 @@ ssize_t cslib_receive(int sckt, void* msg, const size_t bffr_size)
 
     return (ssize_t)total;
 }
-ssize_t cslib_receiveExact(int sckt, void* buffer, size_t length)
-{
-    size_t total = 0;
-
-    while (total < length)
-    {
-        ssize_t n = cslib_receive(
-            sckt,
-            (char*)buffer + total,
-            length - total
-        );
-
-        if (n == 0)
-            return 0;
-
-        if (n < 0)
-        {
-            if (errno == EINTR)
-                continue;
-
-            return -1;
-        }
-
-        total += (size_t)n;
-    }
-
-    return (ssize_t)total;
-}
-
 
 const char* cslib_socketerror_str(const int errorcode)
 {
