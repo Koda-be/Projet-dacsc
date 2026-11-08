@@ -7,7 +7,7 @@
 
 typedef enum
 {
-    obep_login,
+    obep_login = 1,
     obep_logout,
     obep_get_auth,
     obep_get_subj,
@@ -18,13 +18,13 @@ typedef enum
 
 typedef enum
 {
-    obep_req,
+    obep_req = 1,
     obep_ans
 } obep_msg_type_t;
 
 typedef enum
 {
-    obep_norslt,
+    obep_norslt = 1,
     obep_success,
     obep_failure
 } obep_rqst_rslt_t;
@@ -49,6 +49,6 @@ typedef struct obep_rqst_
 obep_msg_t* obep_get_msg(const obep_rqst_t* rqst);
 obep_rqst_t* obep_get_rqst(const obep_msg_t* msg);
 
-size_t obep_get_msg_size(obep_msg_t* msg);
+size_t obep_get_msg_size(const obep_msg_t* msg);
 
 #endif

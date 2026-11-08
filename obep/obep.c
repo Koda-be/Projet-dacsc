@@ -1,22 +1,39 @@
+#include <errno.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "entities.h"
 #include "obep.h"
 
-static const char* LOGIN_STR = "LOGIN  ";
-static const char* LOGOUT_STR = "LOGOUT ";
-static const char* GETAUTH_STR = "GETAUTH";
-static const char* GETSUBJ_STR = "GETSUBJ";
-static const char* ADDAUTH_STR = "ADDAUTH";
-static const char* ADDSUBJ_STR = "ADDSUBJ";
-static const char* ADDBOOK_STR = "ADDBOOK";
+static const char* LOGIN_STR =      "LOGIN  ";
+static const char* LOGOUT_STR =     "LOGOUT ";
+static const char* GETAUTH_STR =    "GETAUTH";
+static const char* GETSUBJ_STR =    "GETSUBJ";
+static const char* ADDAUTH_STR =    "ADDAUTH";
+static const char* ADDSUBJ_STR =    "ADDSUBJ";
+static const char* ADDBOOK_STR =    "ADDBOOK";
 
-static const char* REQ_STR = "REQ";
-static const char* ANS_STR = "ANS";
+static const char* REQ_STR = "RE";
+static const char* ANS_STR = "AN";
 
-static const char* SUCC_STR = "SUCCESS";
-static const char* FAIL_STR = "FAILURE";
+static const char* NORSLT_STR = "       ";
+static const char* SUCC_STR =   "SUCCESS";
+static const char* FAIL_STR =   "FAILURE";
+
+#define ID "ID"
+
+// Employee field strings
+#define LOGIN "login"
+#define PASSWORD "password"
+
+// Author field strings
+#define LNAME "lastname"
+#define FNAME "firstname"
+#define BDATE "birthdate"
+
+// Subject field strings
+#define NAME "name"
 
 // Book field strings
 #define AUTH_ID "auth_id"
@@ -31,39 +48,87 @@ static const char* FAIL_STR = "FAILURE";
 #define xtostr(num) #num
 #define tostr(num) xtostr(num)
 
-#define SEPARATOR "|"
+#define FIELD_SEPARATOR "|"
+#define ARG_SEPARATOR "@"
+#define ARG_SEPARATOR_CHAR '@'
 
 static char* req_get_arg_str(const obep_rqst_t* rqst);
 static char* ans_get_arg_str(const obep_rqst_t* rqst);
+static char* get_login_str(const employee_t* emp);
+static char* get_get_auth_str(const obep_rqst_t* rqst);
+static char* get_get_subj_str(const obep_rqst_t* rqst);
 static char* get_add_auth_str(const author_t* author);
 static char* get_add_subj_str(const subject_t* subject);
 static char* get_add_book_str(const book_t* book);
 
+static int req_msg_to_arg(obep_rqst_t* rqst, const obep_msg_t* msg);
+static int ans_msg_to_arg(obep_rqst_t* rqst, const obep_msg_t* msg);
+static int get_login_rqst(obep_rqst_t* rqst, const obep_msg_t* msg);
+static int get_get_auth_rqst(obep_rqst_t* rqst, const obep_msg_t* msg);
+static int get_get_subj_rqst(obep_rqst_t* rqst, const obep_msg_t* msg);
+static int get_add_auth_rqst(obep_rqst_t* rqst, const obep_msg_t* msg);
+static int get_add_subj_rqst(obep_rqst_t* rqst, const obep_msg_t* msg);
+static int get_add_book_rqst(obep_rqst_t* rqst, const obep_msg_t* msg);
+
 static const char* rqst_type_str(const obep_rqst_type_t rqst);
 static const char* msg_type_str(const obep_msg_type_t msg);
 static const char* rqst_rslt_str(const obep_rqst_rslt_t rslt);
+static obep_rqst_type_t str_to_rqst_type(const char* str);
+static obep_msg_type_t  str_to_msg_type(const char* str);
+static obep_rqst_rslt_t str_to_rqst_rslt(const char* str);
+
+const char* author_format = ID ":%d" FIELD_SEPARATOR
+                            LNAME ":%." tostr(auth_lname_max_len) "s" FIELD_SEPARATOR
+                            FNAME ":%." tostr(auth_fname_max_len) "s" FIELD_SEPARATOR
+                            BDATE ":%." tostr(auth_bdate_max_len) "s";
+
+const char* employee_format =   ID ":%d" FIELD_SEPARATOR
+                                LOGIN ":%." tostr(employee_login_max_len) "s" FIELD_SEPARATOR
+                                PASSWORD ":%." tostr(employee_password_max_len) "s";
+
+const char* subject_format =    ID ":%d" FIELD_SEPARATOR 
+                                NAME ":%." tostr(subj_name_max_len) "s";
+
+// Holy hell that's one ugly format
+const char* book_format =    ID ":%d" FIELD_SEPARATOR
+                            AUTH_ID ":%d" FIELD_SEPARATOR
+                            SUBJ_ID ":%d" FIELD_SEPARATOR
+                            PAGE_COUNT ":%d" FIELD_SEPARATOR
+                            STOCK ":%d" FIELD_SEPARATOR
+                            PRICE ":%.2f" FIELD_SEPARATOR
+                            PUBLISH_YEAR ":%d" FIELD_SEPARATOR
+                            TITLE ":%." tostr(book_title_max_len) "s" FIELD_SEPARATOR
+                            ISBN ":%." tostr(book_isbn_max_len) "s";
+
+// Request to message parsing
 
 obep_msg_t* obep_get_msg(const obep_rqst_t* rqst)
 {
     obep_msg_t* msg = (obep_msg_t*) malloc(sizeof(obep_msg_t));
 
-    char* (* get_arg_str) (const obep_rqst_t* rqst);
+    char* (* get_arg_str) (const obep_rqst_t* rqst) = NULL;
 
-    if(rqst->msg_type == obep_req) get_arg_str = req_get_arg_str;
-    else get_arg_str = ans_get_arg_str;
+    get_arg_str = ((rqst->msg_type == obep_req )? req_get_arg_str : ans_get_arg_str);
 
-    char* arg = get_arg_str(rqst);
+    char* arg = (get_arg_str != NULL ? get_arg_str(rqst) : NULL);
 
-    size_t argsize = strlen(arg);
-    msg->msg = malloc(argsize+1);
+    size_t argsize = 0;
 
-    strncpy(msg->msg, arg, argsize);
-    free(arg);
+    if(arg == NULL) msg->msg = NULL;
+    else
+    {
+        argsize = strlen(arg);
+        msg->msg = malloc(argsize+1);
+
+        strncpy(msg->msg, arg, argsize+1);
+        free(arg);
+    }
     
-    sprintf(msg->header,    "%.4X|%.7s|%.3s", 
-                            (int) argsize, 
+    sprintf(msg->header,    "%.4X|%.7s|%.2s|%.7s", 
+                            (int) (argsize ? argsize+1 : 0),    // To include the \O if non null 
                             rqst_type_str(rqst->rqst_type),
-                            msg_type_str(rqst->msg_type));
+                            msg_type_str(rqst->msg_type),
+                            rqst_rslt_str(rqst->rqst_rslt));
     msg->header[OBEP__HEADER_LENGTH-1] = '#';
 
     return msg;
@@ -75,6 +140,7 @@ char* req_get_arg_str(const obep_rqst_t* rqst)
 {
     switch(rqst->rqst_type)
     {
+        case obep_login:    return get_login_str((const employee_t*) rqst->arg);
         case obep_add_auth: return get_add_auth_str((const author_t*) rqst->arg);
         case obep_add_subj: return get_add_subj_str((const subject_t*) rqst->arg);
         case obep_add_book: return get_add_book_str((const book_t*) rqst->arg);
@@ -82,26 +148,116 @@ char* req_get_arg_str(const obep_rqst_t* rqst)
     }
 }
 
+char* ans_get_arg_str(const obep_rqst_t* rqst)
+{
+    switch(rqst->rqst_type)
+    {
+        case obep_get_auth: return get_get_auth_str(rqst);
+        case obep_get_subj: return get_get_subj_str(rqst);
+        default: return NULL;
+    }
+}
+
+char* get_login_str(const employee_t* empl)
+{
+    if (empl == NULL) return NULL;
+
+    size_t maxstrlen = strlen(employee_format) + employee_login_max_len + employee_password_max_len + 11;
+
+    char* str = (char*) malloc(maxstrlen + 1);
+    snprintf(str, maxstrlen + 1, employee_format, 0, empl->login, empl->pswd);
+
+    return str;
+}
+
+char* get_get_auth_str(const obep_rqst_t* rqst)
+{
+    if (rqst == NULL || rqst->arg == NULL || rqst->argc == 0) return NULL;
+    
+    size_t maxstr1len = strlen(author_format) + auth_lname_max_len + auth_fname_max_len + auth_bdate_max_len + 11 + 1;
+    char* str1 = (char*) malloc(maxstr1len+1);
+
+    size_t maxstrlen = (size_t) rqst->argc * maxstr1len;
+    char* str = (char*) malloc(maxstrlen+1); 
+
+    const author_t* authors = (author_t*) rqst->arg;
+
+    for(int i = 0; i < rqst->argc; i++)
+    {
+        snprintf(str1, maxstr1len,  author_format, authors[i].id, authors[i].last_name, authors[i].first_name, authors[i].birth_date);
+        strcat(str1, ARG_SEPARATOR);
+        strncat(str, str1, maxstr1len);
+    }
+
+    free(str1);
+
+    str[maxstrlen] = '\0';
+    return str;
+}
+
+char* get_get_subj_str(const obep_rqst_t* rqst)
+{
+    if (rqst == NULL || rqst->arg == NULL || rqst->argc == 0) return NULL;
+
+    size_t maxstr1len = strlen(subject_format) + subj_name_max_len + 11 + 1;
+    char* str1 = (char*) malloc(maxstr1len + 1);
+
+    size_t maxstrlen = (size_t) rqst->argc * maxstr1len;
+    char* str = (char*) malloc(maxstrlen+1);
+
+    const subject_t* subjects = (subject_t*) rqst->arg;
+
+    for(int i = 0; i < rqst->argc; i++)
+    {
+        snprintf(str1, maxstr1len, subject_format, subjects[i].id, subjects[i].name);
+        strcat(str1, ARG_SEPARATOR);
+        strncat(str, str1, maxstr1len);
+    }
+
+    free(str1);
+
+    str[maxstrlen] = '\0';
+    return str;
+}
+
+char* get_add_auth_str(const author_t* auth)
+{
+    if (auth == NULL) return NULL;
+
+    size_t maxstrlen = strlen(author_format) + auth_lname_max_len + auth_fname_max_len + auth_bdate_max_len + 11;
+
+    char* str = (char*) malloc(maxstrlen+1);
+
+    snprintf(str, maxstrlen + 1, author_format, 0, auth->last_name, auth->first_name, auth->birth_date);
+
+    return str;
+}
+
+char* get_add_subj_str(const subject_t* subj)
+{
+    if(subj == NULL) return NULL;
+
+    size_t maxstrlen = strlen(subject_format) + subj_name_max_len + 11;
+    char* str = (char*) malloc(maxstrlen+1);
+
+    snprintf(str, maxstrlen + 1, subject_format, 0, subj->name);
+
+    return str;
+}
+
 char* get_add_book_str(const book_t* book)
 {
-    if(book->auth == NULL || book->subj == NULL) return NULL;
+    if(book == NULL) return NULL;
 
-    // Holy hell that's one ugly format
-    const char* format =    AUTH_ID ":%d" SEPARATOR
-                            SUBJ_ID ":%d" SEPARATOR
-                            PAGE_COUNT ":%d" SEPARATOR
-                            STOCK ":%d" SEPARATOR
-                            PRICE ":.2f" SEPARATOR
-                            PUBLISH_YEAR ":%d" SEPARATOR
-                            TITLE ":%." tostr(book_title_max_len) "s" SEPARATOR
-                            ISBN ":%." tostr(book_isbn_max_len) "s";
+    if((book->processed && (book->auth.auth == NULL || book->subj.subj == NULL)) || book->auth.auth_id == 0 || book->subj.subj_id == 0) return NULL; 
 
-    size_t maxstrlen = strlen(format)+100+20+60; // add 100 for title, 20 for isbn, 10 for each number
+    size_t maxstrlen = strlen(book_format)+book_title_max_len+book_isbn_max_len+66; // add 100 for title, 20 for isbn, 10 for each number
 
-    char* str = malloc(maxstrlen);
-    snprintf(str, maxstrlen, format,    
-                            book->auth->id, 
-                            book->subj->id,
+    char* str = (char*) malloc(maxstrlen+1);
+    snprintf(str, maxstrlen + 1, book_format,    
+                            0,
+                            (book->processed ? book->auth.auth->id : book->auth.auth_id), 
+                            (book->processed ? book->subj.subj->id : book->subj.subj_id),
                             book->page_count,
                             book->stock_quantity,
                             book->price,
@@ -110,6 +266,341 @@ char* get_add_book_str(const book_t* book)
                             book->isbn);
 
     return str;
+}
+
+
+// Message to request conversion
+
+obep_rqst_t* obep_get_rqst(const obep_msg_t* msg)
+{
+    obep_rqst_t* rqst = malloc(sizeof(obep_rqst_t));
+    char    rqst_t_str[8] = {0},
+            msg_t_str[3] = {0},
+            rslt_str[8] = {0};
+
+    sscanf(msg->header, "%*4X|%7[^\n]|%2[^\n]|%7[^\n]", rqst_t_str, msg_t_str, rslt_str);
+
+    rqst->rqst_type = str_to_rqst_type(rqst_t_str);
+    rqst->msg_type = str_to_msg_type(msg_t_str);
+    rqst->rqst_rslt = str_to_rqst_rslt(rslt_str);
+
+    int (*get_arg)(obep_rqst_t* rqst, const obep_msg_t* msg) = (rqst->msg_type == obep_req ) ? req_msg_to_arg : ans_msg_to_arg;
+
+    if(get_arg == NULL)
+    {
+        rqst->argc = 0;
+        rqst->arg = NULL;
+    } 
+    else 
+        if(get_arg(rqst, msg) == -1) 
+        {
+            free(rqst);
+            errno = EINVAL;
+            return NULL;
+        }
+    
+    return rqst;
+}
+
+int req_msg_to_arg(obep_rqst_t* rqst, const obep_msg_t* msg)
+{
+    switch(rqst->rqst_type)
+    {
+        case obep_login: return get_login_rqst(rqst, msg);
+        case obep_add_auth: return get_add_auth_rqst(rqst, msg);
+        case obep_add_subj: return get_add_subj_rqst(rqst, msg);
+        case obep_add_book: return get_add_book_rqst(rqst, msg);
+        default: 
+            rqst->argc = 0;
+            rqst->arg = NULL;
+            return 0;
+    }
+}
+
+int ans_msg_to_arg(obep_rqst_t* rqst, const obep_msg_t* msg)
+{
+    switch(rqst->rqst_type)
+    {
+        case obep_get_auth: return get_get_auth_rqst(rqst, msg);
+        case obep_get_subj: return get_get_subj_rqst(rqst, msg);
+        default:
+            rqst->argc = 0;
+            rqst->arg = NULL;
+            return 0;
+    }
+}
+
+static int scan_employee(employee_t* empl, const char* str)
+{
+    char *str1, *token, *context;
+
+    size_t size = strlen(str)+1;
+    str1 = (char*) malloc(size);
+    strncpy(str1, str, size);
+
+    if((token = strtok_r(str1, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, ID ":%d", &empl->id) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, LOGIN ":%" tostr(employee_login_max_len) "[^\n]", empl->login) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, PASSWORD ":%" tostr(employee_password_max_len) "[^\n]", empl->pswd) != 1) goto error_exit;
+
+    free(str1);
+    
+    return 0;
+error_exit:
+    free(str1);
+    return -1;
+}
+
+int get_login_rqst(obep_rqst_t* rqst, const obep_msg_t* msg)
+{
+    employee_t* employee = NULL;
+
+    if(rqst == NULL) goto error_exit;
+    if(msg == NULL || msg->msg == NULL) goto cleanup;
+
+    employee = (employee_t*) malloc(sizeof(employee_t));
+
+    if(scan_employee(employee, msg->msg)) goto cleanup;
+
+    rqst->arg = employee;
+    rqst->argc = 1;
+
+    return 0;
+
+cleanup:
+    free(employee);
+    rqst->argc = 0;
+    rqst->arg = NULL;
+
+error_exit:
+    return -1;
+}
+
+static int scan_author(author_t* auth, const char* str)
+{
+    char *str1, *token, *context;
+
+    size_t size = strlen(str)+1;
+    str1 = (char*) malloc(size);
+    strncpy(str1, str, size);
+
+    if((token = strtok_r(str1, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, ID ":%d", &auth->id) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, LNAME ":%" tostr(auth_lname_max_len) "[^\n]", auth->last_name) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, FNAME ":%" tostr(auth_fname_max_len) "[^\n]", auth->first_name) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, BDATE ":%" tostr(auth_bdate_max_len) "[^\n]", auth->birth_date) != 1) goto error_exit; 
+
+    free(str1);
+    
+    return 0;
+error_exit:
+    free(str1);
+    return -1;
+}
+
+int get_get_auth_rqst(obep_rqst_t* rqst, const obep_msg_t* msg)
+{
+    if(rqst == NULL || msg == NULL || msg->msg == NULL) goto error_exit;
+    
+    char    *token = NULL,
+            *context = NULL,
+            *str1 = NULL;
+
+    size_t size = strlen(msg->msg)+1;
+    str1 = (char*) malloc(size);
+    strncpy(str1, msg->msg, size);
+    char* str_backup = str1; 
+
+    for (int i=0; msg->msg[i]; i++)
+        rqst->argc += (msg->msg[i] == ARG_SEPARATOR_CHAR);
+
+    author_t* auth = (author_t*) malloc( sizeof(author_t) * (size_t) rqst->argc);
+
+    for(int i = 0; (token = strtok_r(str1, ARG_SEPARATOR, &context)) != NULL; i++)
+    {
+        str1 = NULL; // No problem bcs of str_backup
+
+        if(scan_author(&auth[i], token) == -1) goto cleanup; 
+    }
+
+    free(str_backup);
+    rqst->arg = auth;
+    return 0;
+
+cleanup:
+    free(str_backup);
+    free(auth);
+    rqst->argc = 0;
+
+error_exit:
+    return -1;
+}
+
+static int scan_subject(subject_t* subj, const char* str)
+{
+    char *str1, *token, *context;
+
+    size_t size = strlen(str)+1;
+    str1 = (char*) malloc(size);
+    strncpy(str1, str, size);
+
+    if((token = strtok_r(str1, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, ID ":%d", &subj->id) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, NAME ":%" tostr(subj_name_max_len) "[^\n]", subj->name) != 1) goto error_exit; 
+
+    free(str1);
+    
+    return 0;
+error_exit:
+    free(str1);
+    return -1;
+}
+
+int get_get_subj_rqst(obep_rqst_t* rqst, const obep_msg_t* msg)
+{
+    if(rqst == NULL || msg == NULL || msg->msg == NULL) goto error_exit;
+    
+    char    *token = NULL,
+            *context = NULL,
+            *str1 = NULL;
+
+    size_t size = strlen(msg->msg)+1;
+    str1 = (char*) malloc(size);
+    strncpy(str1, msg->msg, size);
+    char* str_backup = str1; 
+
+    for (int i=0; msg->msg[i]; i++)
+        rqst->argc += (msg->msg[i] == ARG_SEPARATOR_CHAR);
+
+    subject_t* subj = (subject_t*) malloc( sizeof(subject_t) * (size_t) rqst->argc);
+
+    for(int i = 0; (token = strtok_r(str1, ARG_SEPARATOR, &context)) != NULL; i++)
+    {
+        str1 = NULL;
+
+        if(scan_subject(&subj[i], token) == -1) goto cleanup;
+    }
+
+    free(str_backup);
+    rqst->arg = subj;
+    return 0;
+
+cleanup:
+    free(str_backup);
+    free(subj);
+    rqst->argc = 0;
+
+error_exit:
+    return -1;
+}
+
+int get_add_auth_rqst(obep_rqst_t* rqst, const obep_msg_t* msg)
+{
+    author_t* auth = NULL;
+
+    if(rqst == NULL) goto error_exit;
+    if(msg == NULL || msg->msg == NULL) goto cleanup;
+
+    auth = (author_t*) malloc(sizeof(author_t));
+
+    if(scan_author(auth, msg->msg) == -1) goto cleanup;
+
+    rqst->arg = auth;
+    rqst->argc = 1;
+
+    return 0;
+
+cleanup:
+    free(auth);
+    rqst->argc = 0;
+    rqst->arg = NULL;
+
+error_exit:
+    return -1;
+}
+
+int get_add_subj_rqst(obep_rqst_t* rqst, const obep_msg_t* msg)
+{
+    subject_t* subj = NULL;
+
+    if(rqst == NULL) goto error_exit;
+    if(msg == NULL || msg->msg == NULL) goto cleanup;
+
+    subj = (subject_t*) malloc(sizeof(subject_t));
+
+    if(scan_subject(subj, msg->msg) == -1) goto cleanup;
+
+    rqst->arg = subj;
+    rqst->argc = 1;
+
+    return 0;
+
+cleanup:
+    free(subj);
+    rqst->argc = 0;
+    rqst->arg = NULL;
+
+error_exit:
+    return -1;
+}
+
+static int scan_book(book_t* book, const char* str)
+{
+    char *str1, *token, *context;
+
+    size_t size = strlen(str)+1;
+    str1 = (char*) malloc(size);
+    strncpy(str1, str, size);
+
+    if((token = strtok_r(str1, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, ID ":%d", &book->id) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, AUTH_ID ":%d", &(book->auth.auth_id)) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, SUBJ_ID ":%d", &(book->subj.subj_id)) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, PAGE_COUNT ":%d", &book->page_count) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, STOCK ":%d", &book->stock_quantity) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, PRICE ":%f", &book->price) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, PUBLISH_YEAR ":%d", &book->publish_year) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, TITLE ":%" tostr(book_title_max_len) "[^\n]", book->title) != 1) goto error_exit;
+    if((token = strtok_r(NULL, FIELD_SEPARATOR, &context)) == NULL || sscanf(token, ISBN ":%" tostr(book_isbn_max_len) "[^\n]", book->isbn) != 1) goto error_exit;
+
+    book->processed = 0;
+
+    free(str1);
+    
+    return 0;
+error_exit:
+    free(str1);
+    return -1;
+}
+
+int get_add_book_rqst(obep_rqst_t* rqst, const obep_msg_t* msg)
+{
+    book_t* book = NULL;
+
+    if(rqst == NULL) goto error_exit;
+    if(msg == NULL || msg->msg == NULL) goto cleanup;
+
+    book= (book_t*) malloc(sizeof(book_t));
+
+    if(scan_book(book, msg->msg) == -1) goto cleanup;
+
+    rqst->arg = book;
+    rqst->argc = 1;
+
+    return 0;
+
+cleanup:
+    free(book);
+    rqst->argc = 0;
+    rqst->arg = NULL;
+
+error_exit:
+    return -1;
+}
+
+size_t obep_get_msg_size(const obep_msg_t *msg)
+{
+    size_t size = 0;
+
+    sscanf(msg->header, "%zX", &size);
+
+    return size;
 }
 
 const char* rqst_type_str(const obep_rqst_type_t rqst)
@@ -141,8 +632,36 @@ const char* rqst_rslt_str(const obep_rqst_rslt_t rslt)
 {
     switch(rslt)
     {
-        case obep_success: return SUCC_STR;
-        case obep_failure: return FAIL_STR;
+        case obep_norslt:   return NORSLT_STR;
+        case obep_success:  return SUCC_STR;
+        case obep_failure:  return FAIL_STR;
         default: return NULL;
     }
+}
+
+obep_rqst_type_t str_to_rqst_type(const char* str)
+{
+    if(!strcmp(str, LOGIN_STR)) return obep_login;
+    if(!strcmp(str, LOGOUT_STR)) return obep_logout;
+    if(!strcmp(str, GETAUTH_STR)) return obep_get_auth;
+    if(!strcmp(str, GETSUBJ_STR)) return obep_get_subj;
+    if(!strcmp(str, ADDAUTH_STR)) return obep_add_auth;
+    if(!strcmp(str, ADDSUBJ_STR)) return obep_add_subj;
+    if(!strcmp(str, ADDBOOK_STR)) return obep_add_book;
+    return 0;
+}
+
+obep_msg_type_t str_to_msg_type(const char* str)
+{
+    if(!strcmp(str, REQ_STR)) return obep_req;
+    if(!strcmp(str, ANS_STR)) return obep_ans;
+    return 0;
+}
+
+obep_rqst_rslt_t str_to_rqst_rslt(const char* str)
+{
+    if(!strcmp(str, NORSLT_STR)) return obep_norslt;
+    if(!strcmp(str, SUCC_STR)) return obep_success;
+    if(!strcmp(str, FAIL_STR)) return obep_failure;
+    return 0;
 }
