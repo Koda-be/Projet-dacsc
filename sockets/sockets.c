@@ -7,6 +7,7 @@
 #include <netdb.h>
 #include <errno.h>
 #include "sockets.h"
+#include <errno.h>
 
 static int cslib_getaddrinfo(const char* host, const int port, const int hint_flags, struct addrinfo** results);
 
@@ -74,14 +75,18 @@ int cslib_clientSocket(const char* ip, const int port)
 
     struct addrinfo* results;
 
-    if(cslib_getaddrinfo(ip, port, 0, &results) != 0)
+    if (cslib_getaddrinfo(ip, port, 0, &results) != 0)
     {
         close(s);
         errno = CSLIB_EADDRESS_INFO_OBTENTION;
         return -1;
     }
 
-    if(connect(s, results->ai_addr, results->ai_addrlen) == -1)
+    int status = connect(s, results->ai_addr, results->ai_addrlen);
+
+    freeaddrinfo(results);
+
+    if (status == -1)
     {
         freeaddrinfo(results);
         close(s);
@@ -119,7 +124,6 @@ ssize_t cslib_send(int sckt, const void* msg, const size_t bffr_size)
         }
 
         total += (size_t)n;
-
     }
 
     return (ssize_t)total;
@@ -148,6 +152,34 @@ ssize_t cslib_receive(int sckt, void* msg, const size_t bffr_size)
             return 0;
         }
         
+        if (n < 0)
+        {
+            if (errno == EINTR)
+                continue;
+
+            return -1;
+        }
+
+        total += (size_t)n;
+    }
+
+    return (ssize_t)total;
+}
+ssize_t cslib_receiveExact(int sckt, void* buffer, size_t length)
+{
+    size_t total = 0;
+
+    while (total < length)
+    {
+        ssize_t n = cslib_receive(
+            sckt,
+            (char*)buffer + total,
+            length - total
+        );
+
+        if (n == 0)
+            return 0;
+
         if (n < 0)
         {
             if (errno == EINTR)
@@ -196,4 +228,32 @@ static int cslib_getaddrinfo(const char* host, const int port, const int hint_fl
     int retval = getaddrinfo(host, portstr, &hints, results);
 
     return retval;
+}
+
+int cslib_setTimeouts(int sckt, int seconds)
+{
+    if (sckt < 0 || seconds <= 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    struct timeval timeout;
+
+    timeout.tv_sec = seconds;
+    timeout.tv_usec = 0;
+
+    if (setsockopt(sckt, SOL_SOCKET, SO_RCVTIMEO,
+                   &timeout, sizeof(timeout)) == -1)
+    {
+        return -1;
+    }
+
+    if (setsockopt(sckt, SOL_SOCKET, SO_SNDTIMEO,
+                   &timeout, sizeof(timeout)) == -1)
+    {
+        return -1;
+    }
+
+    return 0;
 }
