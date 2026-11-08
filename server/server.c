@@ -20,7 +20,7 @@
 typedef struct node_
  {
     int fd;
-    struct node* next;
+    struct node_* next;
  } node_t;
 
 int configure(char* filepath, int* port, int* nbthread);
@@ -39,7 +39,7 @@ int add_auth_to_db(const author_t* auth);
 int add_subj_to_db(const subject_t* subj);
 int add_book_to_db(const book_t* book);
 
-int waitlist_push(int fd);
+void waitlist_push(int fd);
 int waitlist_pop(void);
 
 pthread_key_t   key_ID,
@@ -103,6 +103,8 @@ int main(void)
         waitlist_push(srvcscket);
 
         pthread_cond_signal(&waitlistCond);
+
+        pthread_mutex_unlock(&waitlistMutex);
     }
 
     return 0;
@@ -461,4 +463,32 @@ int check_if_usable_str(const char* str)
             if(str[i] == MYSQL_RESERVED_CHAR[j]) return 0;
     
     return 1;
+}
+
+// waitlist manipulation
+void waitlist_push(int fd)
+{
+    node_t** indirect = &waitlist;
+
+    while((*indirect) != NULL) indirect = &(*indirect)->next;
+
+    *indirect = malloc(sizeof(node_t));
+
+    (*indirect)->next = NULL;
+
+    (*indirect)->fd = fd;
+}
+
+int waitlist_pop(void)
+{
+    node_t* first = waitlist;
+
+    if(first == NULL) return -1;
+
+    waitlist = first->next;
+
+    int result = first->fd;
+    free(first);
+
+    return result;
 }
