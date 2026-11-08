@@ -60,6 +60,7 @@ static char* get_get_subj_str(const obep_rqst_t* rqst);
 static char* get_add_auth_str(const author_t* author);
 static char* get_add_subj_str(const subject_t* subject);
 static char* get_add_book_str(const book_t* book);
+static char* get_ID_str(const obep_rqst_t* rqst);
 
 static int req_msg_to_arg(obep_rqst_t* rqst, const obep_msg_t* msg);
 static int ans_msg_to_arg(obep_rqst_t* rqst, const obep_msg_t* msg);
@@ -69,6 +70,7 @@ static int get_get_subj_rqst(obep_rqst_t* rqst, const obep_msg_t* msg);
 static int get_add_auth_rqst(obep_rqst_t* rqst, const obep_msg_t* msg);
 static int get_add_subj_rqst(obep_rqst_t* rqst, const obep_msg_t* msg);
 static int get_add_book_rqst(obep_rqst_t* rqst, const obep_msg_t* msg);
+static int get_str_ID(obep_rqst_t* rqst, const obep_msg_t* msg);
 
 static const char* rqst_type_str(const obep_rqst_type_t rqst);
 static const char* msg_type_str(const obep_msg_type_t msg);
@@ -154,6 +156,10 @@ char* ans_get_arg_str(const obep_rqst_t* rqst)
     {
         case obep_get_auth: return get_get_auth_str(rqst);
         case obep_get_subj: return get_get_subj_str(rqst);
+        case obep_add_auth:
+        case obep_add_subj:
+        case obep_add_book: 
+            return get_ID_str(rqst);
         default: return NULL;
     }
 }
@@ -221,6 +227,25 @@ char* get_get_subj_str(const obep_rqst_t* rqst)
     free(str1);
 
     str[maxstrlen] = '\0';
+    return str;
+}
+
+char* get_ID_str(const obep_rqst_t* rqst)
+{
+    if (rqst == NULL || rqst->arg == NULL || rqst->argc == 0) return NULL;
+
+    if(rqst->rqst_rslt == obep_failure) return NULL;
+
+    char str1[11];
+
+    sprintf(str1, "%d", *(int*) (rqst->arg));
+
+    size_t strsize = strlen(str1) +1;
+
+    char* str = malloc(strsize);
+
+    strncpy(str, str1, strsize);
+
     return str;
 }
 
@@ -328,6 +353,10 @@ int ans_msg_to_arg(obep_rqst_t* rqst, const obep_msg_t* msg)
     {
         case obep_get_auth: return get_get_auth_rqst(rqst, msg);
         case obep_get_subj: return get_get_subj_rqst(rqst, msg);
+        case obep_add_auth:
+        case obep_add_subj:
+        case obep_add_book:
+            return get_str_ID(rqst, msg);
         default:
             rqst->argc = 0;
             rqst->arg = NULL;
@@ -597,6 +626,23 @@ cleanup:
 
 error_exit:
     return -1;
+}
+
+int get_str_ID(obep_rqst_t* rqst, const obep_msg_t* msg)
+{
+    if(rqst->rqst_rslt == obep_failure)
+    {
+        rqst->arg = NULL;
+        rqst->argc = 0;
+        return 0;
+    }
+
+    rqst->arg = malloc(sizeof(int));
+    *(int*) rqst->arg = atoi(msg->msg);
+
+    rqst->argc = 1;
+
+    return 0;
 }
 
 size_t obep_get_msg_size(const obep_msg_t *msg)
