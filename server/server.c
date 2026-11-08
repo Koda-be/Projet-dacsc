@@ -302,6 +302,34 @@ int get_subj_from_db(subject_t** subj)
     return (int) rows;
 }
 
+int add_auth_to_db(const author_t* auth)
+{
+    if(!(check_if_usable_str(auth->last_name) && check_if_usable_str(auth->first_name) && check_if_usable_str(auth->birth_date))) return -1;
+
+    const char* format = "INSERT INTO authors (last_name, first_name, birth_date) values(%20s, %20s, %20s);";
+    char  query[82 + auth_lname_max_len + auth_fname_max_len + auth_bdate_max_len + 1];
+
+    sprintf(query, format, auth->last_name, auth->first_name, auth->birth_date);
+
+    if(mysql_query(mysqlConnection, query) != 0) return -1;
+
+    return 0;
+}
+
+int add_subj_to_db(const subject_t* subj)
+{
+    if(!check_if_usable_str(subj->name)) return -1;
+
+    const char* format = "INSERT INTO subjects (name) values(%20s);";
+    char  query[42 + subj_name_max_len + 1];
+
+    sprintf(query, format, subj->name);
+
+    if(mysql_query(mysqlConnection, query) != 0) return -1;
+
+    return 0;
+}
+
 int add_book_to_db(const book_t* book)
 {
     if(!(check_if_usable_str(book->isbn) && check_if_usable_str(book->title))) return -1;
