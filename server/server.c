@@ -14,7 +14,14 @@
 #define PORT_ENCODING "PORT_ENCODING"
 #define NTHREAD "NTHREAD"
 
-#define trace(format, ...) printf("[%d] > " format "\n", getpid() __VA_OPT__(,) __VA_ARGS__);
+#define trace(format, ...) printf("[%d::%d] > " format "\n", getpid(), *(int*) pthread_getspecific(key_ID) __VA_OPT__(,) __VA_ARGS__);
+#define loggedIn *(int*) pthread_getspecific(key_loggedIn)
+
+typedef struct node_
+ {
+    int fd;
+    struct node* next;
+ } node_t;
 
 int configure(char* filepath, int* port, int* nbthread);
 
@@ -32,16 +39,25 @@ int add_auth_to_db(const author_t* auth);
 int add_subj_to_db(const subject_t* subj);
 int add_book_to_db(const book_t* book);
 
+int waitlist_push(int fd);
+int waitlist_pop(void);
+
 pthread_key_t   key_ID,
                 key_loggedIn;
 
 pthread_mutex_t mysqlMutex = PTHREAD_MUTEX_INITIALIZER,
-                getIdMutex = PTHREAD_MUTEX_INITIALIZER;
+                getIdMutex = PTHREAD_MUTEX_INITIALIZER,
+                waitlistMutex = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_cond_t waitlistCond = PTHREAD_COND_INITIALIZER;
 
 int  nbthread = 0;
 pthread_t threads;
 
 MYSQL* mysqlConnection = NULL;
+
+node_t* waitlist;
+int waitlist_length;
 
 int main(void)
 {
@@ -49,8 +65,6 @@ int main(void)
     pthread_key_create(&key_loggedIn, free);
 
     pthread_setspecific(key_ID, (void*) get_ID());
-
-
 
     int port = 0;
 
@@ -74,6 +88,9 @@ int main(void)
 
     int lstnscket = cslib_serverSocket(port);
 
+    waitlist = NULL;
+    waitlist_length = 0;
+
     while(1)
     {
         trace("listening on socket %d...", lstnscket);
@@ -81,7 +98,11 @@ int main(void)
 
         trace("Accepted connection with socket %d", srvcscket);
 
-        connectionHandler(&srvcscket);
+        pthread_mutex_lock(&waitlistMutex);
+
+        waitlist_push(srvcscket);
+
+        pthread_cond_signal(&waitlistCond);
     }
 
     return 0;
@@ -163,9 +184,13 @@ void* connectionHandler(void* arg)
         obep_rqst_t* rqst = obep_get_rqst(&msg);
         free(msg.msg);
 
+        pthread_mutex_lock(&mysqlMutex);
+
         obep_rqst_t* rslt = processRequest(rqst);
 
         if(rslt->rqst_rslt == obep_failure) trace("Rqst failed: mysql error: %s", mysql_error(mysqlConnection));
+
+        pthread_mutex_unlock(&mysqlMutex);
 
         free(rqst->arg); free(rqst);
 
