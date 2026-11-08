@@ -14,7 +14,6 @@ DEBUGFLAGS=-ggdb
 RELEASEFLAGS=-O2 -D NDEBUG
 
 #Main target names
-CSERVER=cserver
 CCLIENT=ClientBookEncoderQt
 
 #Module languages specifications
@@ -30,6 +29,7 @@ DACSC:	cserver cclient tests
 
 
 cserver:	$(CSERVER)/server
+cclient:	$(RELEASE)/$(CCLIENT)
 
 # Probably very stupid to call cmake inside a make target but oh well
 $(RELEASE)/$(CCLIENT):	$(CCLIENT)/* $(OBJS)/sockets.o
