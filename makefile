@@ -2,6 +2,7 @@ OBJS=objs
 BIN=bin
 DEBUG=$(BIN)/debug
 RELEASE=$(BIN)/release
+CMAKEBUILD=/tmp/cmakebuild
 
 #C compiler
 CCOMP=gcc
@@ -10,6 +11,10 @@ WFLAGS=-pedantic-errors -Werror -Wall -Wextra -Wconversion -Wsign-conversion
 FLAGS=-I$(HEADERS) $(WFLAGS) -pthread
 DEBUGFLAGS=-ggdb
 RELEASEFLAGS=-O2 -D NDEBUG
+
+#Main target names
+CSERVER=cserver
+CCLIENT=ClientBookEncoderQt
 
 #Module languages specifications
 CMODULE_NAMES :=sockets obep
@@ -20,13 +25,16 @@ CTESTS :=$(patsubst %,$(DEBUG)/%.test,$(CMODULE_NAMES))
 TESTS :=$(CTESTS)
 
 #Main and generic targets
-DACSC:	cserver cclient
+DACSC:	$(RELEASE)/$(CSERVER) $(RELEASE)/$(CCLIENT) tests
 
 
-cserver:	tests
+$(RELEASE)/$(CSERVER):	
 
-
-cclient:
+# Probably very stupid to call cmake inside a make target but oh well
+$(RELEASE)/$(CCLIENT):	$(CCLIENT)/* $(OBJS)/sockets.o
+			cmake -S $(CCLIENT) -B $(CMAKEBUILD)/$(CCLIENT)
+			cmake --build $(CMAKEBUILD)/$(CCLIENT)
+			mv $(CMAKEBUILD)/$(CCLIENT)/$(CCLIENT) $(RELEASE)
 
 
 $(CMODULES):	$(OBJS)/$@.o
@@ -34,6 +42,14 @@ $(CMODULES):	$(OBJS)/$@.o
 
 
 tests:	$(TESTS)
+
+
+# Target for the object file of the module in release mode
+.SECONDEXPANSION:
+$(OBJS)/%.o:	MODNAME =$(patsubst $(OBJS)/%.o,%,$@)
+
+$(OBJS)/%.o:	$$(MODNAME)/$$(MODNAME).c $(HEADERS)/%.h
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
 
 
 # Target for the object file of the module in debug mode
@@ -73,6 +89,7 @@ $(DEBUG)/obep.test:		$(OBJS)/debug_obep.o $(OBJS)/test_obep.o
 
 clean:
 		rm -f $(OBJS)/*.o
+		rm -rf $(CMAKEBUILD)/*
 
 clobber: clean
 		rm -f $(RELEASE)/*

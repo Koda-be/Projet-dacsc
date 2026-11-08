@@ -178,7 +178,9 @@ char* get_get_auth_str(const obep_rqst_t* rqst)
     char* str1 = (char*) malloc(maxstr1len+1);
 
     size_t maxstrlen = (size_t) rqst->argc * maxstr1len;
-    char* str = (char*) malloc(maxstrlen+1); 
+    char* str = (char*) malloc(maxstrlen+1);
+    if (str == NULL) return NULL;
+    str[0] = '\0';
 
     const author_t* authors = (author_t*) rqst->arg;
 
@@ -204,6 +206,8 @@ char* get_get_subj_str(const obep_rqst_t* rqst)
 
     size_t maxstrlen = (size_t) rqst->argc * maxstr1len;
     char* str = (char*) malloc(maxstrlen+1);
+    if (str == NULL) return NULL;
+    str[0] = '\0';
 
     const subject_t* subjects = (subject_t*) rqst->arg;
 
@@ -273,7 +277,8 @@ char* get_add_book_str(const book_t* book)
 
 obep_rqst_t* obep_get_rqst(const obep_msg_t* msg)
 {
-    obep_rqst_t* rqst = malloc(sizeof(obep_rqst_t));
+    obep_rqst_t* rqst = calloc(1, sizeof(obep_rqst_t));
+    if (rqst == NULL) return NULL;
     char    rqst_t_str[8] = {0},
             msg_t_str[3] = {0},
             rslt_str[8] = {0};
