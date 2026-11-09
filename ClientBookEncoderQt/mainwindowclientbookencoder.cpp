@@ -71,9 +71,10 @@ static bool envoyerAjoutObep(
     return succes;
 }
 
-MainWindowClientBookEncoder::MainWindowClientBookEncoder(QWidget *parent)
+MainWindowClientBookEncoder::MainWindowClientBookEncoder(string& IP, int PORT, QWidget *parent)
     : QMainWindow(parent)
-    , ui(new Ui::MainWindowClientBookEncoder)
+    , ui(new Ui::MainWindowClientBookEncoder),
+    ip{IP}, port{PORT}
 {
     ui->setupUi(this);
     //this->setFixedSize(1068, 301);
@@ -459,7 +460,7 @@ void MainWindowClientBookEncoder::on_actionLogin_triggered()
     requete.rqst_rslt = obep_norslt;
     requete.arg = &employe;
 
-    socketServeur = cslib_clientSocket("127.0.0.1", 45678);
+    socketServeur = cslib_clientSocket(ip.c_str(), port);
 
     if (socketServeur < 0)
     {
