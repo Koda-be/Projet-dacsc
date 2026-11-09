@@ -110,6 +110,8 @@ int main(void)
     {
         obep_rqst_t* rcvd = recv_rqsts[i];
 
+        int k = 3, m = 5;
+
         switch(rcvd->rqst_type)
         {
             case obep_login: 
@@ -143,15 +145,15 @@ int main(void)
                 printansarg = printsubject;
                 break;
             case obep_add_auth:
-                ans.rqst_type = obep_login;
+                ans.rqst_type = obep_add_auth;
                 ans.rqst_rslt = obep_success;
                 ans.msg_type = obep_ans;
-                ans.argc = 0;
-                ans.arg = NULL;
+                ans.argc = 1;
+                ans.arg = &k;
                 break;
             case obep_add_subj:
                 ans.rqst_type = obep_add_subj;
-                ans.rqst_rslt = obep_success;
+                ans.rqst_rslt = obep_failure;
                 ans.msg_type = obep_ans;
                 ans.argc = 0;
                 ans.arg = NULL;
@@ -160,8 +162,8 @@ int main(void)
                 ans.rqst_type = obep_add_book;
                 ans.rqst_rslt = obep_success;
                 ans.msg_type = obep_ans;
-                ans.argc = 0;
-                ans.arg = NULL;
+                ans.argc = 1;
+                ans.arg = &m;
                 break;
         }
 

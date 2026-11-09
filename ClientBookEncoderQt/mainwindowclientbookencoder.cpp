@@ -28,7 +28,8 @@ static bool copierChamp(char* destination, size_t capacite, const string& valeur
     return true;
 }
 
-static bool envoyerAjoutObep(
+
+static int envoyerAjoutObep(
     int socket,
     obep_rqst_type_t type,
     void* donnees,
@@ -44,7 +45,13 @@ static bool envoyerAjoutObep(
     obep_msg_t* message = obep_get_msg(&requete);
 
     if (message == nullptr)
-        return false;
+        return -1;
+
+    if (message->msg == nullptr)
+    {
+        std::free(message);
+        return -1;
+    }
 
     bool envoye = obep_send_frame(socket, message) == 0;
 
@@ -52,28 +59,52 @@ static bool envoyerAjoutObep(
     std::free(message);
 
     if (!envoye)
-        return false;
+        return -1;
 
     obep_msg_t reponse{};
 
     if (obep_receive_frame(socket, &reponse) != 0)
     {
         std::free(reponse.msg);
-        return false;
+        return -1;
     }
 
+    int id = -1;
+
     bool succes =
-        std::memcmp(reponse.header, "0000|", 5) == 0 &&
         std::memcmp(reponse.header + 5, commande, 7) == 0 &&
         std::memcmp(reponse.header + 12, "|AN|SUCCESS#", 12) == 0;
 
+    if (succes && reponse.msg != nullptr)
+    {
+        obep_rqst_t* resultat = obep_get_rqst(&reponse);
+
+        if (resultat != nullptr)
+        {
+            if (resultat->rqst_type == type &&
+                resultat->msg_type == obep_ans &&
+                resultat->rqst_rslt == obep_success &&
+                resultat->argc == 1 &&
+                resultat->arg != nullptr)
+            {
+                id = *static_cast<int*>(resultat->arg);
+            }
+
+            std::free(resultat->arg);
+            std::free(resultat);
+        }
+    }
+
     std::free(reponse.msg);
-    return succes;
+
+    return id > 0 ? id : -1;
 }
 
-MainWindowClientBookEncoder::MainWindowClientBookEncoder(QWidget *parent)
+
+MainWindowClientBookEncoder::MainWindowClientBookEncoder(string& IP, int PORT, QWidget *parent)
     : QMainWindow(parent)
-    , ui(new Ui::MainWindowClientBookEncoder)
+    , ui(new Ui::MainWindowClientBookEncoder),
+    ip{IP}, port{PORT}
 {
     ui->setupUi(this);
     //this->setFixedSize(1068, 301);
@@ -306,7 +337,11 @@ void MainWindowClientBookEncoder::on_pushButtonAddAuthor_clicked()
         return;
     }
 
-    if (envoyerAjoutObep(socketServeur, obep_add_auth, &auteur, "ADDAUTH"))
+    int idAuteur = envoyerAjoutObep(
+        socketServeur, obep_add_auth, &auteur, "ADDAUTH"
+    );
+
+    if (idAuteur > 0)   
     {
         this->dialogMessage("Auteur", "Auteur ajoute avec succes !");
         this->chargerListes();
@@ -329,7 +364,11 @@ void MainWindowClientBookEncoder::on_pushButtonAddSubject_clicked()
         return;
     }
 
-    if (envoyerAjoutObep(socketServeur, obep_add_subj, &sujet, "ADDSUBJ"))
+    int idSujet = envoyerAjoutObep(
+        socketServeur, obep_add_subj, &sujet, "ADDSUBJ"
+    );
+
+    if (idSujet > 0)
     {
         this->dialogMessage("Sujet", "Sujet ajoute avec succes !");
         this->chargerListes();
@@ -366,10 +405,14 @@ void MainWindowClientBookEncoder::on_pushButtonAddBook_clicked()
         return;
     }
 
-    if (envoyerAjoutObep(socketServeur, obep_add_book, &livre, "ADDBOOK"))
+    int idLivre = envoyerAjoutObep(
+        socketServeur, obep_add_book, &livre, "ADDBOOK"
+    );
+
+    if (idLivre > 0)
     {
         this->addTupleTableBooks(
-            -1,
+            idLivre,
             this->getTitle(),
             this->getSelectionAuthor(),
             this->getSelectionSubject(),
@@ -459,7 +502,7 @@ void MainWindowClientBookEncoder::on_actionLogin_triggered()
     requete.rqst_rslt = obep_norslt;
     requete.arg = &employe;
 
-    socketServeur = cslib_clientSocket("127.0.0.1", 45678);
+    socketServeur = cslib_clientSocket(ip.c_str(), port);
 
     if (socketServeur < 0)
     {
