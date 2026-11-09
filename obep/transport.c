@@ -17,7 +17,7 @@ int obep_send_frame(int socket, const obep_msg_t* message)
 
     cslib_send(socket, message->header, OBEP__HEADER_LENGTH);
     cslib_send(socket, message->msg, obep_get_msg_size(message));
-    printf("\n\nSent message %24s%s\n\n", message->header, message->msg);
+    printf("\n\nSent message %.24s%s\n\n", message->header, message->msg);
 
 /*
     char longueurHex[5] = {0};
@@ -133,6 +133,8 @@ int obep_receive_frame(int socket, obep_msg_t* message)
             return -1;
         }
     }
+
+    printf("\n\nReceived: %.24s%s\n\n", recu.header, recu.msg);
 
     // 7. Terminer la chaine en memoire
     //recu.msg[longueur] = '\0';

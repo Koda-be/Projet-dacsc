@@ -96,6 +96,11 @@ int main(void)
     trace("Successfully connected to DB",);
 
     int lstnscket = cslib_serverSocket(port);
+    if(lstnscket < 0) 
+    {
+        trace("Unavailable port",);
+        exit(0);
+    }
 
     waitlist = NULL;
     waitlist_length = 0;
@@ -218,7 +223,7 @@ void connectionHandler(int socket)
             cslib_receive(socket, msg.msg, msgsize);
         }
 
-        trace("Received message %24s%s", msg.header, msg.msg);
+        trace("Received message %.24s%s", msg.header, msg.msg);
 
         obep_rqst_t* rqst = obep_get_rqst(&msg);
         free(msg.msg);
@@ -304,31 +309,52 @@ obep_rqst_t* processRequest(obep_rqst_t* rqst)
             break;
         
         case obep_add_auth:
-            rslt->rqst_rslt = ((rslt->argc = add_auth_to_db((author_t*) rqst->arg) > 0) ? obep_success : obep_failure);
-
-            if(rslt->argc == -1)
+            rslt->arg = malloc(sizeof(int));
+            if((*(int*) rslt->arg = add_auth_to_db((author_t*) rqst->arg)) > 0)
             {
+                rslt->argc = 1;
+                rslt->rqst_rslt = obep_success;                
+            }
+            else
+            {
+                rslt->rqst_rslt = obep_failure;
                 rslt->argc = 0;
+                free(rslt->arg);
+                rslt->arg = NULL;
             }
 
             break;
         
         case obep_add_subj:
-            rslt->rqst_rslt = ((rslt->argc = add_subj_to_db((subject_t*) rqst->arg) > 0) ? obep_success : obep_failure);
-            
-            if(rslt->argc == -1)
+            rslt->arg = malloc(sizeof(int));
+            if((*(int*) rslt->arg = add_subj_to_db((subject_t*) rqst->arg)) > 0)
             {
+                rslt->argc = 1;
+                rslt->rqst_rslt = obep_success;                
+            }
+            else
+            {
+                rslt->rqst_rslt = obep_failure;
                 rslt->argc = 0;
+                free(rslt->arg);
+                rslt->arg = NULL;
             }
 
             break;
         
         case obep_add_book:
-            rslt->rqst_rslt = (( rslt->argc = add_book_to_db((book_t*) rqst->arg)) > 0 ? obep_success : obep_failure);
-
-            if(rslt->argc == -1)
+            rslt->arg = malloc(sizeof(int));
+            if((*(int*) rslt->arg = add_book_to_db((book_t*) rqst->arg)) > 0)
             {
+                rslt->argc = 1;
+                rslt->rqst_rslt = obep_success;                
+            }
+            else
+            {
+                rslt->rqst_rslt = obep_failure;
                 rslt->argc = 0;
+                free(rslt->arg);
+                rslt->arg = NULL;
             }
 
             break;
@@ -434,6 +460,8 @@ int add_auth_to_db(const author_t* auth)
 
     if(mysql_query(mysqlConnection, insertQuery) != 0) return -1;
 
+    if(mysql_query(mysqlConnection, selectQuery) != 0) return -1;
+
     if((rslt = mysql_store_result(mysqlConnection)) == NULL) return -1;
 
     MYSQL_ROW row = mysql_fetch_row(rslt);
@@ -463,6 +491,8 @@ int add_subj_to_db(const subject_t* subj)
 
     if(mysql_query(mysqlConnection, query) != 0) return -1;
 
+    if(mysql_query(mysqlConnection, selectQuery) != 0) return -1;
+
     if((rslt = mysql_store_result(mysqlConnection)) == NULL) return -1;
 
     MYSQL_ROW row = mysql_fetch_row(rslt);
@@ -483,7 +513,17 @@ int add_book_to_db(const book_t* book)
 
     if(mysql_query(mysqlConnection, query) != 0) return -1;
 
-    return 0;
+    const char* selectFormat = "SELECT id FROM books WHERE author_id=%d and subject_id=%d and page_count=%d and stock_quantity=%d and price=%f and publish_year=%d and title=\'%s\' and isbn=\'%s\';";
+    char selectQuery[160 + book_title_max_len + book_isbn_max_len + 2 + 11*6 + 1];
+    sprintf(selectQuery,      selectFormat, (book->processed ? book->auth.auth->id : book->auth.auth_id), (book->processed ? book->subj.subj->id : book->subj.subj_id), book->page_count, book->stock_quantity, book->price, book->publish_year, book->title, book->isbn);
+
+    if(mysql_query(mysqlConnection, selectQuery) != 0) return -1;
+    
+    MYSQL_RES* rslt;
+    if((rslt = mysql_store_result(mysqlConnection)) == NULL) return -1;
+
+    MYSQL_ROW row = mysql_fetch_row(rslt);
+    return atoi(row[0]);
 }
 
 int check_if_usable_str(const char* str)
