@@ -412,7 +412,7 @@ void MainWindowClientBookEncoder::on_pushButtonAddBook_clicked()
     if (idLivre > 0)
     {
         this->addTupleTableBooks(
-            -1,
+            idLivre,
             this->getTitle(),
             this->getSelectionAuthor(),
             this->getSelectionSubject(),
