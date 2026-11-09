@@ -286,6 +286,9 @@ obep_rqst_t* processRequest(obep_rqst_t* rqst)
 
         case obep_logout:
             loggedIn = 0;
+            rslt->argc = 0;
+            rslt->arg = NULL;
+            rslt->rqst_rslt = obep_success;
             break;
 
         case obep_get_auth:
