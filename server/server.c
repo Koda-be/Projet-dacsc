@@ -185,6 +185,7 @@ void* threadHandler(void* arg)
     UNUSED(arg); // to supress unused parameter warning
 
     pthread_setspecific(key_ID, get_ID());
+    pthread_setspecific(key_loggedIn, malloc(sizeof(int)));
 
     int socket = -1;
 
@@ -193,7 +194,7 @@ void* threadHandler(void* arg)
         trace("Waiting for connection",);
         pthread_mutex_lock(&waitlistMutex);
         while((socket = waitlist_pop()) == -1) pthread_cond_wait(&waitlistCond, &waitlistMutex);
-        pthread_mutex_lock(&waitlistMutex);
+        pthread_mutex_unlock(&waitlistMutex);
 
         trace("Connected on socket %d", socket);
 
@@ -206,11 +207,18 @@ void connectionHandler(int socket)
 {
     obep_msg_t msg;
 
-    while(cslib_receive(socket, msg.header, OBEP__HEADER_LENGTH) != -1)
+    while(cslib_receive(socket, msg.header, OBEP__HEADER_LENGTH) > 0)
     {   
-        trace("Received message %24s", msg.header); 
+        msg.msg = NULL;
+        size_t msgsize = obep_get_msg_size(&msg);
+        if(msgsize != 0)
+        {
+            msg.msg = malloc(msgsize);
 
-        msg.msg = malloc(obep_get_msg_size(&msg));
+            cslib_receive(socket, msg.msg, msgsize);
+        }
+
+        trace("Received message %24s%s", msg.header, msg.msg);
 
         obep_rqst_t* rqst = obep_get_rqst(&msg);
         free(msg.msg);
@@ -233,6 +241,8 @@ void connectionHandler(int socket)
         cslib_send(socket, response->msg, obep_get_msg_size(response));
 
         free(response->msg); free(response);
+
+        msg.header[0] = '\0';
     }
 }
 
@@ -280,6 +290,7 @@ obep_rqst_t* processRequest(obep_rqst_t* rqst)
                 rslt->argc = 0;
                 rslt->rqst_rslt = obep_failure;
             }
+            rslt->rqst_rslt = obep_success;
             break;
 
         case obep_get_subj:
@@ -289,38 +300,37 @@ obep_rqst_t* processRequest(obep_rqst_t* rqst)
                 rslt->argc = 0;
                 rslt->rqst_rslt = obep_failure;
             }
+            rslt->rqst_rslt = obep_success;
             break;
         
         case obep_add_auth:
-            rslt->rqst_rslt = (add_auth_to_db((author_t*) rqst->arg) ? obep_success : obep_failure);
+            rslt->rqst_rslt = ((rslt->argc = add_auth_to_db((author_t*) rqst->arg) > 0) ? obep_success : obep_failure);
 
             if(rslt->argc == -1)
             {
                 rslt->argc = 0;
-                rslt->rqst_rslt = obep_failure;
             }
 
             break;
         
         case obep_add_subj:
-            rslt->rqst_rslt = (add_subj_to_db((subject_t*) rqst->arg) ? obep_success : obep_failure);
+            rslt->rqst_rslt = ((rslt->argc = add_subj_to_db((subject_t*) rqst->arg) > 0) ? obep_success : obep_failure);
             
             if(rslt->argc == -1)
             {
                 rslt->argc = 0;
-                rslt->rqst_rslt = obep_failure;
             }
 
             break;
         
         case obep_add_book:
-            rslt->rqst_rslt = (add_book_to_db((book_t*) rqst->arg) ? obep_success : obep_failure);
+            rslt->rqst_rslt = (( rslt->argc = add_book_to_db((book_t*) rqst->arg)) > 0 ? obep_success : obep_failure);
 
             if(rslt->argc == -1)
             {
                 rslt->argc = 0;
-                rslt->rqst_rslt = obep_failure;
             }
+
             break;
     };
 
@@ -331,7 +341,7 @@ obep_rqst_t* processRequest(obep_rqst_t* rqst)
 
 // MYSQL 
 
-#define MYSQL_RESERVED_CHAR "\"*;'"
+#define MYSQL_RESERVED_CHAR "\"*;\'"
 
 int check_if_usable_str(const char* str);
 
@@ -339,7 +349,7 @@ int check_employee_existence(const employee_t* empl)
 {
     if(!(check_if_usable_str(empl->login) && check_if_usable_str(empl->pswd))) return 0;
 
-    const char format[] = "SELECT * FROM employees WHERE login=%20s AND password=%20s";
+    const char format[] = "SELECT * FROM employees WHERE login=\'%s\' AND password=\'%s\'";
     char query[50 + employee_login_max_len + employee_password_max_len + 1];
     
     sprintf(query, format, empl->login, empl->pswd);
@@ -404,7 +414,7 @@ int add_auth_to_db(const author_t* auth)
 {
     if(!(check_if_usable_str(auth->last_name) && check_if_usable_str(auth->first_name) && check_if_usable_str(auth->birth_date))) return -1;
 
-    const char* selectFormat = "SELECT * FROM authors WHERE last_name=\"%20s\" AND first_name=\"%20s\";";
+    const char* selectFormat = "SELECT * FROM authors WHERE last_name=\'%s\' AND first_name=\'%s\';";
     char selectQuery[68+auth_lname_max_len + auth_fname_max_len + 1];
 
     sprintf(selectQuery, selectFormat, auth->last_name, auth->first_name);
@@ -417,7 +427,7 @@ int add_auth_to_db(const author_t* auth)
     if(mysql_num_rows(rslt) != 0) return -1;
 
 
-    const char* insertFormat = "INSERT INTO authors (last_name, first_name, birth_date) values(%20s, %20s, %20s);";
+    const char* insertFormat = "INSERT INTO authors (last_name, first_name, birth_date) values(\'%s\', \'%s\', \'%s\');";
     char insertQuery[82 + auth_lname_max_len + auth_fname_max_len + auth_bdate_max_len + 1];
 
     sprintf(insertQuery, insertFormat, auth->last_name, auth->first_name, auth->birth_date);
@@ -434,7 +444,7 @@ int add_subj_to_db(const subject_t* subj)
 {
     if(!check_if_usable_str(subj->name)) return -1;
 
-    const char* selectFormat = "SELECT * FROM subjects WHERE name=\"%20s\";";
+    const char* selectFormat = "SELECT * FROM subjects WHERE name=\'%s\';";
     char selectQuery[42+ subj_name_max_len + 1];
 
     sprintf(selectQuery, selectFormat, subj->name);
@@ -446,7 +456,7 @@ int add_subj_to_db(const subject_t* subj)
 
     if(mysql_num_rows(rslt) != 0) return -1;
 
-    const char* format = "INSERT INTO subjects (name) values(%20s);";
+    const char* format = "INSERT INTO subjects (name) values(\'%s\');";
     char  query[42 + subj_name_max_len + 1];
 
     sprintf(query, format, subj->name);
@@ -463,7 +473,7 @@ int add_book_to_db(const book_t* book)
 {
     if(!(check_if_usable_str(book->isbn) && check_if_usable_str(book->title))) return -1;
 
-    const char* format = "INSERT INTO books (author_id, subject_id, page_count, stock_quantity, price, publish_year, title, isbn) values(%d, %d, %d, %d, %f, %d, %100s, %20s);";
+    const char* format = "INSERT INTO books (author_id, subject_id, page_count, stock_quantity, price, publish_year, title, isbn) values(%d, %d, %d, %d, %f, %d, \'%s\', \'%s\');";
     char  query[149 + book_title_max_len + book_isbn_max_len + 2 + 11 * 6 + 1];
 
     sprintf(query,      format, 
