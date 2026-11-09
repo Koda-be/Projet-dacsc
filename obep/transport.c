@@ -1,7 +1,9 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
+#include "obep.h"
 #include "obep_transport.h"
 #include "sockets.h"
 
@@ -13,6 +15,11 @@ int obep_send_frame(int socket, const obep_msg_t* message)
         return -1;
     }
 
+    cslib_send(socket, message->header, OBEP__HEADER_LENGTH);
+    cslib_send(socket, message->msg, obep_get_msg_size(message));
+    printf("\n\nSent message %24s%s\n\n", message->header, message->msg);
+
+/*
     char longueurHex[5] = {0};
     memcpy(longueurHex, message->header, 4);
 
@@ -40,7 +47,7 @@ int obep_send_frame(int socket, const obep_msg_t* message)
         if (cslib_send(socket, message->msg, (size_t)longueur) < 0)
             return -1;
     }
-
+*/
     return 0;
 }
 
@@ -68,6 +75,9 @@ int obep_receive_frame(int socket, obep_msg_t* message)
 
         return -1;
     }
+
+    /*
+
 
     // 2. Verifier les separateurs de l'en-tete
     if (recu.header[4] != '|' ||
@@ -99,10 +109,11 @@ int obep_receive_frame(int socket, obep_msg_t* message)
     memcpy(longueurHex, recu.header, 4);
     longueurHex[4] = '\0';
 
-    size_t longueur = (size_t)strtoul(longueurHex, NULL, 16);
+    size_t longueur = (size_t)strtoul(longueurHex, NULL, 16);*/
 
+    size_t longueur = obep_get_msg_size(&recu);
     // 5. Allouer le buffer du contenu
-    recu.msg = malloc(longueur + 1);
+    recu.msg = malloc(longueur);
 
     if (recu.msg == NULL)
         return -1;
@@ -124,7 +135,7 @@ int obep_receive_frame(int socket, obep_msg_t* message)
     }
 
     // 7. Terminer la chaine en memoire
-    recu.msg[longueur] = '\0';
+    //recu.msg[longueur] = '\0';
 
     // 8. Transmettre le message complet a l'appelant
     *message = recu;
