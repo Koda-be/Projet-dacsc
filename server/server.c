@@ -62,6 +62,21 @@ MYSQL* mysqlConnection = NULL;
 
 node_t* waitlist;
 
+static int has_selected_database(MYSQL* connection)
+{
+    if (mysql_query(connection, "SELECT DATABASE()") != 0)
+        return 0;
+
+    MYSQL_RES* result = mysql_store_result(connection);
+    if (result == NULL)
+        return 0;
+
+    MYSQL_ROW row = mysql_fetch_row(result);
+    const int selected = row != NULL && row[0] != NULL && row[0][0] != '\0';
+    mysql_free_result(result);
+    return selected;
+}
+
 int main(void)
 {
     if (pthread_key_create(&key_loggedIn, NULL) != 0)
@@ -96,9 +111,17 @@ int main(void)
     if (mysql_options(mysqlConnection, MYSQL_READ_DEFAULT_FILE, MYSQL_OPTIONS_FILE) != 0 ||
         mysql_options(mysqlConnection, MYSQL_READ_DEFAULT_GROUP, "dacsc") != 0 ||
         mysql_options(mysqlConnection, MYSQL_SET_CHARSET_NAME, "utf8mb4") != 0 ||
-        mysql_real_connect(mysqlConnection, NULL, NULL, NULL, "PourStudent", 0, NULL, 0) == NULL)
+        mysql_real_connect(mysqlConnection, NULL, NULL, NULL, NULL, 0, NULL, 0) == NULL)
     {
         fprintf(stderr, "MySQL connection failed: %s\n", mysql_error(mysqlConnection));
+        mysql_close(mysqlConnection);
+        return EXIT_FAILURE;
+    }
+
+    if (!has_selected_database(mysqlConnection))
+    {
+        fprintf(stderr, "No MySQL database selected. Set database in [dacsc] in %s.\n",
+                MYSQL_OPTIONS_FILE);
         mysql_close(mysqlConnection);
         return EXIT_FAILURE;
     }

@@ -30,15 +30,18 @@ cp -i .mysql-dacsc.cnf.example .mysql-dacsc.cnf
   transmet les identifiants applicatifs en clair.
 - `.mysql-dacsc.cnf` est requis. Renseigner le compte local dans le groupe
   `[dacsc]`, conserver les permissions `0600` et adapter l'hôte, le port ou
-  la socket au besoin. Le serveur utilise la base existante `PourStudent`.
+  la socket au besoin. Définir `database=PourStudent` ou `database=DACSC`
+  selon le schéma existant sur la machine. Conserver une seule ligne
+  `database` dans le groupe. Le serveur s'arrête au démarrage si le schéma
+  est absent, introuvable ou inaccessible au compte configuré.
   Le compte doit pouvoir lire les employés et lire et ajouter les auteurs,
   sujets et livres. Les identifiants MySQL et ceux utilisés dans Qt sont
   distincts.
 
 Lancer `./bin/release/server` et `./bin/release/ClientBookEncoderQt` dans
 deux terminaux, chacun depuis la racine. Les fichiers locaux sont ignorés
-par Git. La mise à jour d'une installation existante nécessite de créer
-le fichier d'options MySQL avant de redémarrer le serveur.
+par Git. Sur une installation existante, ajouter la ligne `database` au
+fichier d'options MySQL local avant de redémarrer le serveur.
 
 ## Tester avec une base existante
 

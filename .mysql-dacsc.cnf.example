@@ -1,5 +1,8 @@
 [dacsc]
 host=localhost
+# Use the existing schema on this machine.
+database=PourStudent
+# For a deployment using DACSC, set database=DACSC instead.
 # user=
 # password=
 # port=
