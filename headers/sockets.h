@@ -14,6 +14,7 @@
 
 /* Creates a socket and starts listening for any incoming connection on port */
 int cslib_serverSocket(const int port);
+int cslib_serverSocketAt(const char* ip, const int port);
 
 /* Creates a service socket from a connection to the listening socket srvrscket */
 int cslib_accept(int srvrscket);

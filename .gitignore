@@ -68,3 +68,10 @@ ClientBookEncoderQt/**
 !ClientBookEncoderQt/mainwindowclientbookencoder.cpp
 !ClientBookEncoderQt/mainwindowclientbookencoder.h
 !ClientBookEncoderQt/ui_mainwindowclientbookencoder.h
+
+# Local credentials and launch configuration
+.client.cfg
+.server.cfg
+.mysql-dacsc.cnf
+
+.test-dacsc.credentials

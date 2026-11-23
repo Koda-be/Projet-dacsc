@@ -13,6 +13,11 @@ static int cslib_getaddrinfo(const char* host, const int port, const int hint_fl
 
 int cslib_serverSocket(const int port)
 {
+    return cslib_serverSocketAt(NULL, port);
+}
+
+int cslib_serverSocketAt(const char* ip, const int port)
+{
     int s = socket(AF_INET, SOCK_STREAM, 0);
 
     if(s == -1)
@@ -24,7 +29,7 @@ int cslib_serverSocket(const int port)
     struct addrinfo *results = NULL;
 
 
-    if(cslib_getaddrinfo(NULL, port, AI_PASSIVE, &results) != 0)
+    if(cslib_getaddrinfo(ip, port, AI_PASSIVE, &results) != 0)
     {
         close(s);
 
@@ -35,7 +40,9 @@ int cslib_serverSocket(const int port)
         return -1;
     }
 
-    if(bind(s, results->ai_addr, results->ai_addrlen) < 0)
+    const int reuse = 1;
+    if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0 ||
+        bind(s, results->ai_addr, results->ai_addrlen) < 0)
     {
         freeaddrinfo(results);
         close(s);
@@ -56,15 +63,7 @@ int cslib_serverSocket(const int port)
 
 int cslib_accept(int srvrscket)
 {
-    int s = accept(srvrscket, NULL, NULL);
-
-    if(s == -1)
-    {
-        errno = CSLIB_EACCEPT_CONNECTION;
-        return -1;
-    }
-
-    return s;
+    return accept(srvrscket, NULL, NULL);
 }
 
 int cslib_clientSocket(const char* ip, const int port)
@@ -91,12 +90,13 @@ int cslib_clientSocket(const char* ip, const int port)
 
     int status = connect(s, results->ai_addr, results->ai_addrlen);
 
+    const int connect_error = errno;
     freeaddrinfo(results);
 
     if (status == -1)
     {
         close(s);
-        errno = CSLIB_ECONNECT_TO_SERVER;
+        errno = connect_error;
         return -1;
     }
 
