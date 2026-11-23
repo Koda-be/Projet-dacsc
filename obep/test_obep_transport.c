@@ -22,7 +22,7 @@ int main(void)
     // Construire une trame OBEP de test
     obep_msg_t envoye = {0};
 
-    memcpy(envoye.header, "0005|LOGIN  |RE|       #",
+    memcpy(envoye.header, "0006|LOGIN  |RE|       #",
        OBEP__HEADER_LENGTH);
 
     envoye.msg = "hello";
@@ -80,6 +80,13 @@ int main(void)
         }
 
         free(autreMessage.msg);
+    }
+
+    if (cslib_send(sockets[0], "0005|LOGIN  |RE|       #hello", 29) != 29 ||
+        obep_receive_frame(sockets[1], &recu) != -1 || errno != EPROTO)
+    {
+        fprintf(stderr, "ECHEC : contenu sans nul final accepté !\n");
+        resultat = 1;
     }
 
     close(sockets[0]);

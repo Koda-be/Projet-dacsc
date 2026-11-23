@@ -2,14 +2,17 @@ OBJS=objs
 BIN=bin
 DEBUG=$(BIN)/debug
 RELEASE=$(BIN)/release
-CMAKEBUILD=/tmp/cmakebuild
+CMAKEBUILD=$(abspath $(OBJS)/cmake)
 
 #C compiler
 CCOMP=gcc
 HEADERS=./headers
 WFLAGS=-pedantic-errors -Werror -Wall -Wextra -Wconversion -Wsign-conversion
-FLAGS=-I$(HEADERS) $(WFLAGS) $(MYSQLFLAGS) -pthread
-MYSQLFLAGS=-I/usr/include/mysql -I/usr/include/mysql/mysql -L/usr/lib/ -lmariadb
+FLAGS=-I$(HEADERS) $(WFLAGS) -pthread
+MYSQL_CONFIG ?= $(shell for config in mysql_config mariadb_config; do command -v $$config && break; done)
+MYSQL_PKG ?= $(shell for package in mysqlclient libmariadb mariadb; do pkg-config --exists $$package && { echo $$package; break; }; done)
+MYSQL_CFLAGS ?= $(if $(MYSQL_PKG),$(shell pkg-config --cflags $(MYSQL_PKG)),$(if $(MYSQL_CONFIG),$(shell $(MYSQL_CONFIG) --cflags)))
+MYSQL_LIBS ?= $(if $(MYSQL_PKG),$(shell pkg-config --libs $(MYSQL_PKG)),$(if $(MYSQL_CONFIG),$(shell $(MYSQL_CONFIG) --libs),-lmariadb))
 DEBUGFLAGS=-ggdb
 RELEASEFLAGS=-O2 -D NDEBUG
 
@@ -28,32 +31,48 @@ TESTS :=$(CTESTS)
 DACSC:	cserver cclient tests
 
 
-cserver:	$(CSERVER)/server
+cserver:	$(CSERVER)
 cclient:	$(RELEASE)/$(CCLIENT)
 
 # Probably very stupid to call cmake inside a make target but oh well
-$(RELEASE)/$(CCLIENT):	$(CCLIENT)/* $(OBJS)/sockets.o
+$(RELEASE)/$(CCLIENT): $(wildcard $(CCLIENT)/* headers/*.h) sockets/sockets.c obep/transport.c obep/obep.c
+			mkdir -p $(@D)
 			cmake -S $(CCLIENT) -B $(CMAKEBUILD)/$(CCLIENT)
-			cmake --build $(CMAKEBUILD)/$(CCLIENT)
+			+cmake --build $(CMAKEBUILD)/$(CCLIENT)
 			mv $(CMAKEBUILD)/$(CCLIENT)/$(CCLIENT) $(RELEASE)
 
-$(CSERVER)/server:	$(OBJS)/server.o $(OBJS)/sockets.o $(OBJS)/obep.o
-			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) $^ -o $@
+$(CSERVER):	$(OBJS)/server.o $(OBJS)/sockets.o $(OBJS)/obep.o $(OBJS)/transport.o
+			mkdir -p $(@D)
+			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) $^ $(MYSQL_LIBS) -o $@
+
+$(OBJS)/transport.o: obep/transport.c $(HEADERS)/obep_transport.h $(HEADERS)/obep.h $(HEADERS)/sockets.h
+	mkdir -p $(@D)
+	$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
 
 # Main target object files
 
-$(OBJS)/server.o:	server/server.c $(HEADERS)/obep.h $(HEADERS)/sockets.h $(HEADERS)/entities.h
-			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
+$(OBJS)/server.o:	server/server.c $(HEADERS)/obep.h $(HEADERS)/sockets.h $(HEADERS)/entities.h $(HEADERS)/obep_transport.h
+			mkdir -p $(@D)
+			$(CCOMP) $(FLAGS) $(MYSQL_CFLAGS) $(RELEASEFLAGS) -c $< -o $@
 
 # Module release object files
 
 $(OBJS)/sockets.o:	sockets/sockets.c $(HEADERS)/sockets.h
+			mkdir -p $(@D)
 			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
 
 $(OBJS)/obep.o:	obep/obep.c $(HEADERS)/obep.h $(HEADERS)/entities.h
+			mkdir -p $(@D)
 			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
 
-tests:	$(TESTS) $(DEBUGCSERVER)/server.test
+tests: $(TESTS) $(DEBUGCSERVER).test $(DEBUG)/obep-transport.test
+
+check: $(DEBUG)/obep-transport.test
+	$<
+
+$(DEBUG)/obep-transport.test: obep/test_obep_transport.c $(OBJS)/transport.o $(OBJS)/debug_sockets.o $(HEADERS)/obep_transport.h
+	mkdir -p $(@D)
+	$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $(filter-out %.h,$^) -o $@
 
 
 # Target for the object file of the module in release mode
@@ -61,6 +80,7 @@ tests:	$(TESTS) $(DEBUGCSERVER)/server.test
 $(OBJS)/%.o:	MODNAME =$(patsubst $(OBJS)/%.o,%,$@)
 
 $(OBJS)/%.o:	$$(MODNAME)/$$(MODNAME).c $(HEADERS)/%.h
+			mkdir -p $(@D)
 			$(CCOMP) $(FLAGS) $(RELEASEFLAGS) -c $< -o $@
 
 
@@ -69,6 +89,7 @@ $(OBJS)/%.o:	$$(MODNAME)/$$(MODNAME).c $(HEADERS)/%.h
 $(OBJS)/debug_%.o:	MODNAME =$(patsubst $(OBJS)/debug_%.o,%,$@)
 
 $(OBJS)/debug_%.o:	$$(MODNAME)/$$(MODNAME).c $(HEADERS)/%.h
+			mkdir -p $(@D)
 			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
 
 
@@ -77,32 +98,39 @@ $(OBJS)/debug_%.o:	$$(MODNAME)/$$(MODNAME).c $(HEADERS)/%.h
 $(OBJS)/test_%.o:	MODNAME =$(patsubst $(OBJS)/test_%.o,%,$@)
 
 $(OBJS)/test_%.o:	$$(MODNAME)/test.c $(HEADERS)/$$(MODNAME).h
+					mkdir -p $(@D)
 					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
 
 # Special object files that depend on more than just the module
 
 $(OBJS)/debug_obep.o:	obep/obep.c $(HEADERS)/obep.h $(HEADERS)/entities.h
+					mkdir -p $(@D)
 					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
 
 $(OBJS)/test_obep.o:	obep/test.c $(HEADERS)/obep.h $(HEADERS)/entities.h
+					mkdir -p $(@D)
 					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
 
-$(OBJS)/debug_server.o:	server/server.c $(HEADERS)/entities.h $(HEADERS)/sockets.h $(HEADERS)/obep.h
-					$(CCOMP) $(FLAGS) $(DEBUGFLAGS) -c $< -o $@
+$(OBJS)/debug_server.o: server/server.c $(HEADERS)/entities.h $(HEADERS)/sockets.h $(HEADERS)/obep.h $(HEADERS)/obep_transport.h
+		mkdir -p $(@D)
+		$(CCOMP) $(FLAGS) $(MYSQL_CFLAGS) $(DEBUGFLAGS) -c $< -o $@
 
 # Module testing targets
 
 $(DEBUG)/sockets.test:	$(OBJS)/debug_sockets.o $(OBJS)/test_sockets.o
+			mkdir -p $(@D)
 			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $(DEBUG)/sockets.test
 
 $(DEBUG)/obep.test:		$(OBJS)/debug_obep.o $(OBJS)/test_obep.o
+			mkdir -p $(@D)
 			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $(DEBUG)/obep.test
 
-$(DEBUGCSERVER)/server.test:	$(OBJS)/debug_server.o $(OBJS)/debug_obep.o $(OBJS)/debug_sockets.o
-			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ -o $@
+$(DEBUGCSERVER).test:	$(OBJS)/debug_server.o $(OBJS)/debug_obep.o $(OBJS)/debug_sockets.o $(OBJS)/transport.o
+			mkdir -p $(@D)
+			$(CCOMP) $(FLAGS) $(DEBUGFLAGS) $^ $(MYSQL_LIBS) -o $@
 
 #phony targets
-.PHONY:	clean clobber newmod
+.PHONY: DACSC cclient cserver tests check clean clobber newmod
 
 clean:
 		rm -f $(OBJS)/*.o

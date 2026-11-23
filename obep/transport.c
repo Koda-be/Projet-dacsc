@@ -1,53 +1,53 @@
-#include <stdio.h>
+#include <ctype.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
-#include "obep.h"
 #include "obep_transport.h"
 #include "sockets.h"
 
+static int frame_size(const obep_msg_t* message, size_t* size)
+{
+    const char* header = message->header;
+    if (header[4] != '|' || header[12] != '|' || header[15] != '|' ||
+        header[OBEP__HEADER_LENGTH - 1] != '#')
+    {
+        errno = EPROTO;
+        return -1;
+    }
+    for (size_t i = 0; i < 4; ++i)
+    {
+        if (!isxdigit((unsigned char) header[i]))
+        {
+            errno = EPROTO;
+            return -1;
+        }
+    }
+
+    char hex[5] = {0};
+    memcpy(hex, header, 4);
+    *size = strtoul(hex, NULL, 16);
+    return 0;
+}
+
 int obep_send_frame(int socket, const obep_msg_t* message)
 {
+    size_t size;
     if (message == NULL)
     {
         errno = EINVAL;
         return -1;
     }
-
-    cslib_send(socket, message->header, OBEP__HEADER_LENGTH);
-    cslib_send(socket, message->msg, obep_get_msg_size(message));
-    printf("\n\nSent message %.24s%s\n\n", message->header, message->msg);
-
-/*
-    char longueurHex[5] = {0};
-    memcpy(longueurHex, message->header, 4);
-
-    char* fin;
-    errno = 0;
-
-    unsigned long longueur = strtoul(longueurHex, &fin, 16);
-
-    if (errno != 0 || fin != longueurHex + 4 ||
-        message->header[4] != '|' ||
-        message->header[12] != '|' ||
-        message->header[15] != '|' ||
-        message->header[OBEP__HEADER_LENGTH - 1] != '#'||
-        (longueur > 0 && message->msg == NULL))
+    if (frame_size(message, &size) < 0)
+        return -1;
+    if (size > 0 && (message->msg == NULL || strlen(message->msg) + 1 != size))
     {
         errno = EINVAL;
         return -1;
     }
-
-    if (cslib_send(socket, message->header, OBEP__HEADER_LENGTH) < 0)
+    if (cslib_send(socket, message->header, OBEP__HEADER_LENGTH) < 0 ||
+        (size > 0 && cslib_send(socket, message->msg, size) < 0))
         return -1;
-
-    if (longueur > 0)
-    {
-        if (cslib_send(socket, message->msg, (size_t)longueur) < 0)
-            return -1;
-    }
-*/
     return 0;
 }
 
@@ -58,89 +58,32 @@ int obep_receive_frame(int socket, obep_msg_t* message)
         errno = EINVAL;
         return -1;
     }
-
-    obep_msg_t recu = {0};
-
-    // 1. Recevoir les 17 octets de l'en-tete
-    ssize_t n = cslib_receive(
-        socket,
-        recu.header,
-        OBEP__HEADER_LENGTH
-    );
-
-    if (n <= 0)
+    obep_msg_t received = {0};
+    ssize_t count = cslib_receive(socket, received.header, OBEP__HEADER_LENGTH);
+    if (count <= 0)
     {
-        if (n == 0)
+        if (count == 0)
             errno = ECONNRESET;
-
         return -1;
     }
 
-    /*
-
-
-    // 2. Verifier les separateurs de l'en-tete
-    if (recu.header[4] != '|' ||
-        recu.header[12] != '|' ||
-        recu.header[15] != '|' ||
-        recu.header[OBEP__HEADER_LENGTH - 1] != '#')
-    {
-        errno = EPROTO;
+    size_t size;
+    if (frame_size(&received, &size) < 0)
         return -1;
-    }
-
-    // 3. Verifier les 4 caracteres hexadecimaux
-    for (size_t i = 0; i < 4; i++)
+    if (size > 0)
     {
-        char c = recu.header[i];
-
-        if (!((c >= '0' && c <= '9') ||
-              (c >= 'A' && c <= 'F') ||
-              (c >= 'a' && c <= 'f')))
+        received.msg = malloc(size);
+        if (received.msg == NULL)
+            return -1;
+        count = cslib_receive(socket, received.msg, size);
+        if (count <= 0 || memchr(received.msg, '\0', size) != received.msg + size - 1)
         {
-            errno = EPROTO;
+            if (count >= 0)
+                errno = count == 0 ? ECONNRESET : EPROTO;
+            free(received.msg);
             return -1;
         }
     }
-
-    // 4. Convertir la longueur hexadecimale
-    char longueurHex[5];
-
-    memcpy(longueurHex, recu.header, 4);
-    longueurHex[4] = '\0';
-
-    size_t longueur = (size_t)strtoul(longueurHex, NULL, 16);*/
-
-    size_t longueur = obep_get_msg_size(&recu);
-    // 5. Allouer le buffer du contenu
-    recu.msg = malloc(longueur);
-
-    if (recu.msg == NULL)
-        return -1;
-
-    // 6. Recevoir exactement le contenu annonce
-    if (longueur > 0)
-    {
-        n = cslib_receive(socket, recu.msg, longueur);
-
-        if (n <= 0)
-        {
-            free(recu.msg);
-
-            if (n == 0)
-                errno = ECONNRESET;
-
-            return -1;
-        }
-    }
-
-    printf("\n\nReceived: %.24s%s\n\n", recu.header, recu.msg);
-
-    // 7. Terminer la chaine en memoire
-    //recu.msg[longueur] = '\0';
-
-    // 8. Transmettre le message complet a l'appelant
-    *message = recu;
-
+    *message = received;
     return 0;
 }

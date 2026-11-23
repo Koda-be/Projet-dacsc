@@ -7,6 +7,7 @@
 #include <QLineEdit>
 #include <QByteArray>
 #include <cstring>
+#include <cerrno>
 #include <cstdlib>
 #include <QStringList>
 
@@ -343,7 +344,7 @@ void MainWindowClientBookEncoder::on_pushButtonAddAuthor_clicked()
 
     if (idAuteur > 0)   
     {
-        this->dialogMessage("Auteur", "Auteur ajoute avec succes !");
+        this->dialogMessage("Auteur", QString("Auteur ajouté (ID %1).").arg(idAuteur).toStdString());
         this->chargerListes();
     }
     else
@@ -370,7 +371,7 @@ void MainWindowClientBookEncoder::on_pushButtonAddSubject_clicked()
 
     if (idSujet > 0)
     {
-        this->dialogMessage("Sujet", "Sujet ajoute avec succes !");
+        this->dialogMessage("Sujet", QString("Sujet ajouté (ID %1).").arg(idSujet).toStdString());
         this->chargerListes();
     }
     else
@@ -423,7 +424,7 @@ void MainWindowClientBookEncoder::on_pushButtonAddBook_clicked()
             this->getStockQuantity()
         );
 
-        this->dialogMessage("Livre", "Livre ajoute avec succes !");
+        this->dialogMessage("Livre", QString("Livre ajouté (ID %1).").arg(idLivre).toStdString());
         this->on_pushButtonClear_clicked();
     }
     else
@@ -506,8 +507,10 @@ void MainWindowClientBookEncoder::on_actionLogin_triggered()
 
     if (socketServeur < 0)
     {
+        const int erreur = errno;
         this->dialogError("Connexion impossible",
-                          cslib_socketerror_str(socketServeur));
+                          QString("%1:%2 — %3").arg(QString::fromStdString(ip))
+                              .arg(port).arg(cslib_socketerror_str(erreur)).toStdString());
 
         socketServeur = -1;
         return;
